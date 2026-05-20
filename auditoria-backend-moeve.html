@@ -1,0 +1,1696 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<title>Auditoría Backend MOEVE — Plexus Tech</title>
+<meta name="viewport" content="width=1280" />
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --navy:#0E3F5C;
+    --navy-dark:#082B41;
+    --navy-soft:#1F5878;
+    --coral:#D26F73;
+    --coral-soft:#E89DA0;
+    --grey-100:#F4F6F8;
+    --grey-200:#E5EAEE;
+    --grey-400:#A8B2BB;
+    --grey-600:#5F6C76;
+    --grey-800:#2A3540;
+    --green:#3FA776;
+    --amber:#E0A030;
+    --red:#C0504D;
+  }
+  html,body{font-family:'Inter',system-ui,sans-serif;background:#0a1320;color:var(--grey-800);margin:0;height:100%;overflow:hidden;}
+  .stage{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;}
+  .deck{position:relative;width:1280px;height:720px;transform-origin:center center;}
+  .slide{
+    width:1280px;height:720px;
+    background:#fff;
+    position:absolute;inset:0;
+    box-shadow:0 20px 60px rgba(0,0,0,.45);
+    overflow:hidden;
+    opacity:0;
+    visibility:hidden;
+    pointer-events:none;
+    z-index:1;
+  }
+  .slide.active{
+    opacity:1;
+    visibility:visible;
+    pointer-events:auto;
+    z-index:2;
+  }
+  /* fixed-size container for charts so Chart.js resizes correctly */
+  .chart-box{position:relative;width:100%;overflow:hidden;}
+  .chart-box canvas{display:block !important;}
+  .anexo-slide .slide-content{overflow-y:auto;padding-right:8px;}
+  .slide-archived{display:none !important;}
+  /* edges */
+  .edge-zone{position:fixed;top:0;width:90px;height:100%;z-index:50;cursor:pointer;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,0);transition:color .25s,background .25s;font-size:54px;font-weight:300;user-select:none;}
+  .edge-zone:hover{color:rgba(255,255,255,.55);}
+  .edge-left{left:0;}
+  .edge-left:hover{background:linear-gradient(to right,rgba(255,255,255,.06),transparent);}
+  .edge-right{right:0;}
+  .edge-right:hover{background:linear-gradient(to left,rgba(255,255,255,.06),transparent);}
+  /* tooltips */
+  .tip{position:relative;cursor:help;border-bottom:1px dotted var(--coral);}
+  .tip:hover::after{
+    content:attr(data-tip);
+    position:absolute;left:0;bottom:calc(100% + 8px);
+    width:280px;background:var(--navy);color:#fff;
+    padding:10px 12px;border-radius:6px;font-size:11px;line-height:1.55;
+    z-index:200;white-space:normal;font-weight:400;letter-spacing:0;text-transform:none;
+    box-shadow:0 6px 18px rgba(0,0,0,.35);
+  }
+  .tip:hover::before{
+    content:"";position:absolute;left:14px;bottom:calc(100% + 2px);
+    border:6px solid transparent;border-top-color:var(--navy);z-index:200;
+  }
+  .tip.tip-end:hover::after{left:auto;right:0;}
+  .tip.tip-end:hover::before{left:auto;right:14px;}
+  /* stars */
+  .stars{--pct:0%;display:inline-block;font-size:22px;position:relative;line-height:1;letter-spacing:3px;font-family:Arial,sans-serif;}
+  .stars::before{content:"★★★★★";color:var(--grey-200);}
+  .stars::after{content:"★★★★★";color:var(--coral);position:absolute;top:0;left:0;width:var(--pct);overflow:hidden;white-space:nowrap;}
+  /* Plexus corner frame: top-right notch + bottom-left notch */
+  .slide::before, .slide::after{
+    content:"";position:absolute;border:2px solid var(--navy);pointer-events:none;
+  }
+  .slide::before{ top:18px;right:18px;width:calc(100% - 60px);height:calc(100% - 60px);
+                  clip-path: polygon(0 0, calc(100% - 36px) 0, 100% 36px, 100% 100%, 36px 100%, 0 calc(100% - 36px));
+                  border:none; background:linear-gradient(var(--navy),var(--navy)) top right/2px calc(100% - 36px) no-repeat,
+                                           linear-gradient(var(--navy),var(--navy)) top right/calc(100% - 36px) 2px no-repeat,
+                                           linear-gradient(var(--navy),var(--navy)) bottom left/2px calc(100% - 36px) no-repeat,
+                                           linear-gradient(var(--navy),var(--navy)) bottom left/calc(100% - 36px) 2px no-repeat,
+                                           linear-gradient(45deg, transparent calc(100% - 2px), var(--navy) calc(100% - 2px) 100%) top right/36px 36px no-repeat,
+                                           linear-gradient(225deg, transparent calc(100% - 2px), var(--navy) calc(100% - 2px) 100%) bottom left/36px 36px no-repeat;
+  }
+  .slide-num{position:absolute;bottom:18px;right:36px;font-size:11px;color:var(--grey-400);letter-spacing:.15em;z-index:5;}
+  .slide-foot{position:absolute;bottom:18px;left:36px;font-size:11px;color:var(--grey-400);letter-spacing:.05em;z-index:5;}
+  .slide-content{position:absolute;inset:56px;z-index:2;display:flex;flex-direction:column;}
+  h1.deck-title{font-size:48px;font-weight:800;color:var(--navy);line-height:1.05;letter-spacing:-.02em;}
+  h2.deck-h2{font-size:32px;font-weight:700;color:var(--navy);letter-spacing:-.01em;}
+  h3.deck-h3{font-size:20px;font-weight:600;color:var(--navy);}
+  .eyebrow{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--coral);font-weight:600;}
+  .accent-bar{width:48px;height:4px;background:var(--coral);}
+  .pill{display:inline-flex;align-items:center;padding:4px 10px;border-radius:999px;font-size:11px;font-weight:600;}
+  .pill-navy{background:var(--navy);color:#fff;}
+  .pill-coral{background:var(--coral);color:#fff;}
+  .pill-green{background:#E6F4ED;color:var(--green);}
+  .pill-amber{background:#FBF1DE;color:var(--amber);}
+  .pill-red{background:#F9E5E4;color:var(--red);}
+  .pill-grey{background:var(--grey-200);color:var(--grey-600);}
+  .kpi-card{background:var(--grey-100);border-left:3px solid var(--coral);padding:14px 16px;border-radius:6px;}
+  .kpi-num{font-size:34px;font-weight:800;color:var(--navy);line-height:1;}
+  .kpi-lbl{font-size:11px;color:var(--grey-600);text-transform:uppercase;letter-spacing:.1em;margin-top:6px;}
+  .data-tbl{width:100%;font-size:12px;}
+  .data-tbl th{background:var(--navy);color:#fff;text-align:left;padding:8px 10px;font-weight:600;}
+  .data-tbl td{padding:7px 10px;border-bottom:1px solid var(--grey-200);}
+  .data-tbl tr:nth-child(even) td{background:var(--grey-100);}
+  .rating-1{color:#fff;background:#B8332E;}
+  .rating-2{color:#fff;background:#D87A2C;}
+  .rating-3{color:#fff;background:#D4A226;}
+  .rating-4{color:#fff;background:#6FA858;}
+  .rating-5{color:#fff;background:#2E7D4F;}
+  .rating-cell{display:inline-block;width:22px;height:22px;border-radius:4px;text-align:center;line-height:22px;font-weight:700;font-size:11px;}
+  .rating-label{display:inline-block;padding:3px 10px;border-radius:3px;font-size:10px;font-weight:700;letter-spacing:.08em;text-align:center;min-width:88px;}
+  .priority-high{background:#F9E5E4;color:#B8332E;}
+  .priority-med{background:#FBF1DE;color:#B97A0E;}
+  .priority-low{background:#E6F4ED;color:#2E7D4F;}
+  .nav-bar{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:rgba(14,63,92,.95);color:#fff;padding:8px 16px;border-radius:999px;font-size:12px;z-index:100;display:flex;gap:12px;align-items:center;}
+  .nav-bar a{color:#fff;cursor:pointer;}
+  @media print{
+    html,body{overflow:auto !important;height:auto !important;background:#fff;}
+    .stage{position:static !important;display:block !important;}
+    .deck{width:auto !important;height:auto !important;transform:none !important;}
+    .slide{position:relative !important;display:block !important;inset:auto !important;opacity:1 !important;visibility:visible !important;page-break-after:always;margin:0 0 16px 0;box-shadow:none;}
+    .edge-zone,.nav-bar{display:none !important;}
+  }
+</style>
+</head>
+<body>
+
+<div class="edge-zone edge-left" id="edgeLeft" onclick="go(-1)">‹</div>
+<div class="edge-zone edge-right" id="edgeRight" onclick="go(1)">›</div>
+
+<div class="nav-bar">
+  <a onclick="go(-1)" style="opacity:.7;font-size:14px;line-height:1;">‹</a>
+  <span id="slideCounter" style="font-variant-numeric:tabular-nums;min-width:48px;text-align:center;">01 / 23</span>
+  <a onclick="go(1)" style="opacity:.7;font-size:14px;line-height:1;">›</a>
+  <span style="opacity:.4;">·</span>
+  <span style="opacity:.6">Auditoría Backend MOEVE</span>
+  <span style="opacity:.4;">·</span>
+  <a onclick="window.print()">PDF</a>
+</div>
+
+<div class="stage" id="stage">
+<div class="deck" id="deck">
+
+<!-- SLIDE 1 — PORTADA -->
+<section class="slide active" id="s1">
+  <div class="slide-content" style="justify-content:space-between;">
+    <div>
+      <img src="assets/plexus-logo.png" style="height:36px"/>
+    </div>
+    <div>
+      <div class="eyebrow">Code Audit · Mayo 2026</div>
+      <div class="accent-bar mt-3 mb-5"></div>
+      <h1 class="deck-title" style="font-size:60px;max-width:920px;">Auditoría Técnica del Backend MOEVE</h1>
+      <p style="color:var(--grey-600);font-size:18px;margin-top:18px;max-width:760px;">
+        Estado del ecosistema de microservicios EMSP, recomendaciones priorizadas y hoja de ruta de modernización.
+      </p>
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:end;">
+      <div>
+        <div style="font-size:11px;color:var(--grey-400);letter-spacing:.18em;text-transform:uppercase;">Preparado por</div>
+        <div style="font-size:16px;font-weight:600;color:var(--navy);margin-top:4px;">Plexus Tech · Equipo de Auditoría</div>
+      </div>
+      <div style="text-align:right;">
+        <div style="font-size:11px;color:var(--grey-400);letter-spacing:.18em;text-transform:uppercase;">Para</div>
+        <div style="font-size:16px;font-weight:600;color:var(--navy);margin-top:4px;">MOEVE</div>
+      </div>
+    </div>
+  </div>
+  <div class="slide-num">01</div>
+</section>
+
+<!-- SLIDE 2 — ÍNDICE -->
+<section class="slide" id="s2">
+  <div class="slide-content">
+    <div class="eyebrow">Índice</div>
+    <h2 class="deck-h2 mt-1">Contenido de la presentación</h2>
+    <div class="accent-bar mt-3 mb-6"></div>
+    <div class="grid grid-cols-2 gap-x-12 gap-y-3 mt-2" style="font-size:14px;">
+      <div class="flex gap-3"><span style="color:var(--coral);font-weight:700;width:24px;">01</span><span>Alcance y objeto de la auditoría</span></div>
+      <div class="flex gap-3"><span style="color:var(--coral);font-weight:700;width:24px;">10</span><span>Dashboard 4 — Operación y observabilidad</span></div>
+      <div class="flex gap-3"><span style="color:var(--coral);font-weight:700;width:24px;">02</span><span>Metodología de evaluación</span></div>
+      <div class="flex gap-3"><span style="color:var(--coral);font-weight:700;width:24px;">11</span><span>Análisis por grupo funcional</span></div>
+      <div class="flex gap-3"><span style="color:var(--coral);font-weight:700;width:24px;">03</span><span>Resumen ejecutivo</span></div>
+      <div class="flex gap-3"><span style="color:var(--coral);font-weight:700;width:24px;">12</span><span>Deep dive · mst (Transaction)</span></div>
+      <div class="flex gap-3"><span style="color:var(--coral);font-weight:700;width:24px;">04</span><span>Mapa funcional del backend</span></div>
+      <div class="flex gap-3"><span style="color:var(--coral);font-weight:700;width:24px;">13</span><span>Deep dive · msu (User)</span></div>
+      <div class="flex gap-3"><span style="color:var(--coral);font-weight:700;width:24px;">05</span><span>Final Score &amp; semáforo global</span></div>
+      <div class="flex gap-3"><span style="color:var(--coral);font-weight:700;width:24px;">14</span><span>Hallazgos transversales</span></div>
+      <div class="flex gap-3"><span style="color:var(--coral);font-weight:700;width:24px;">06</span><span>Dashboard 1 — Modernización</span></div>
+      <div class="flex gap-3"><span style="color:var(--coral);font-weight:700;width:24px;">15</span><span>Hoja de ruta · 4 fases</span></div>
+      <div class="flex gap-3"><span style="color:var(--coral);font-weight:700;width:24px;">07</span><span>Dashboard 2 — Calidad de código</span></div>
+      <div class="flex gap-3"><span style="color:var(--coral);font-weight:700;width:24px;">16</span><span>Quick wins</span></div>
+      <div class="flex gap-3"><span style="color:var(--coral);font-weight:700;width:24px;">08</span><span>Dashboard 3 — Seguridad</span></div>
+      <div class="flex gap-3"><span style="color:var(--coral);font-weight:700;width:24px;">17</span><span>Pre-requisitos y riesgos</span></div>
+      <div class="flex gap-3"><span style="color:var(--coral);font-weight:700;width:24px;">09</span><span>Matriz Prioridad × Esfuerzo</span></div>
+      <div class="flex gap-3"><span style="color:var(--coral);font-weight:700;width:24px;">18</span><span>Próximos pasos</span></div>
+    </div>
+    <div style="margin-top:auto;background:var(--grey-100);padding:14px 18px;border-left:3px solid var(--navy);font-size:13px;color:var(--grey-600);">
+      Anexo · <strong style="color:var(--navy)">Matriz P×E detallada</strong> con todos los hallazgos por servicio, prioridad y esfuerzo estimado.
+    </div>
+  </div>
+  <div class="slide-foot">Auditoría Backend MOEVE · Plexus Tech · 2026</div>
+  <div class="slide-num">02</div>
+</section>
+
+<!-- SLIDE 3 — ALCANCE -->
+<section class="slide" id="s3">
+  <div class="slide-content">
+    <div class="eyebrow">01 · Alcance</div>
+    <h2 class="deck-h2 mt-1">Qué se ha evaluado</h2>
+    <div class="accent-bar mt-3 mb-5"></div>
+    <div class="grid grid-cols-5 gap-4">
+      <div class="kpi-card"><div class="kpi-num">28</div><div class="kpi-lbl">Microservicios auditados</div></div>
+      <div class="kpi-card"><div class="kpi-num">~16k</div><div class="kpi-lbl">Ficheros Java analizados</div></div>
+      <div class="kpi-card"><div class="kpi-num">~400</div><div class="kpi-lbl">Endpoints REST evaluados</div></div>
+      <div class="kpi-card"><div class="kpi-num">7</div><div class="kpi-lbl">Dominios funcionales</div></div>
+      <div class="kpi-card"><div class="kpi-num">10</div><div class="kpi-lbl">Dimensiones técnicas</div></div>
+    </div>
+    <div class="mt-7 grid grid-cols-2 gap-6">
+      <div>
+        <h3 class="deck-h3">Inputs</h3>
+        <ul style="font-size:13px;color:var(--grey-600);line-height:1.7;margin-top:8px;">
+          <li>· Repositorios Git de más de 28 microservicios <code style="font-size:11px;background:var(--grey-100);padding:1px 5px;border-radius:3px;">mkt-emsp-*</code></li>
+          <li>· Métricas SonarCloud (corte 28-abr-2026)</li>
+          <li>· Pipelines CI/CD, Dockerfiles, ficheros de configuración</li>
+          <li>· READMEs, OpenAPI y documentación interna</li>
+        </ul>
+      </div>
+      <div>
+        <h3 class="deck-h3">Dimensiones evaluadas <span style="font-size:11px;color:var(--grey-400);font-weight:400;letter-spacing:0;">— pasa el ratón sobre cada una</span></h3>
+        <ul style="font-size:13px;color:var(--grey-600);line-height:1.9;margin-top:8px;">
+          <li>· <span class="tip" data-tip="Versión de Java y Spring Boot, alineación entre Dockerfile y CI, parent POM y dependencias clave (Hibernate, MariaDB JDBC, Feign).">Actualización del stack (Java / Spring Boot)</span></li>
+          <li>· <span class="tip" data-tip="Cobertura de tests, complejidad ciclomática, tamaño de clases, exclusiones de Sonar, ramas abandonadas y artefactos SNAPSHOT.">Calidad de código y cobertura</span></li>
+          <li>· <span class="tip" data-tip="Gestión de secretos vía entorno, custodia de claves en mscrypt, autenticación JWT/OAuth2 y patrones de cifrado a nivel aplicación.">Seguridad de configuración y secretos</span></li>
+          <li>· <span class="tip" data-tip="Separación de responsabilidades, bounded contexts, acoplamiento entre servicios, duplicidades de lógica y god objects.">Arquitectura y acoplamiento</span></li>
+          <li>· <span class="tip" data-tip="Logging estructurado, healthchecks, métricas, tracing distribuido y migraciones de base de datos.">Observabilidad y operación</span></li>
+          <li>· <span class="tip" data-tip="READMEs, OpenAPI, ADRs, comentarios FIXME/TODO sin ticket y onboarding para nuevos perfiles.">Documentación y mantenibilidad</span></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <div class="slide-foot">Alcance</div>
+  <div class="slide-num">03</div>
+</section>
+
+<!-- SLIDE 4 — METODOLOGÍA / RATING -->
+<section class="slide" id="s4">
+  <div class="slide-content">
+    <div class="eyebrow">02 · Metodología</div>
+    <h2 class="deck-h2 mt-1">Sistema de evaluación</h2>
+    <div class="accent-bar mt-3 mb-5"></div>
+    <div class="grid grid-cols-5 gap-3">
+      <div style="background:var(--grey-100);padding:14px;border-top:4px solid #B8332E;">
+        <div style="font-size:28px;font-weight:800;color:#B8332E;">1</div>
+        <div style="font-size:11px;color:var(--grey-600);margin-top:4px;font-weight:600;">CRÍTICO</div>
+        <div style="font-size:11px;color:var(--grey-600);margin-top:6px;line-height:1.4;">Resolver de inmediato</div>
+      </div>
+      <div style="background:var(--grey-100);padding:14px;border-top:4px solid #D87A2C;">
+        <div style="font-size:28px;font-weight:800;color:#D87A2C;">2</div>
+        <div style="font-size:11px;color:var(--grey-600);margin-top:4px;font-weight:600;">ALTO</div>
+        <div style="font-size:11px;color:var(--grey-600);margin-top:6px;line-height:1.4;">Será problema próximamente</div>
+      </div>
+      <div style="background:var(--grey-100);padding:14px;border-top:4px solid #D4A226;">
+        <div style="font-size:28px;font-weight:800;color:#D4A226;">3</div>
+        <div style="font-size:11px;color:var(--grey-600);margin-top:4px;font-weight:600;">MEDIO</div>
+        <div style="font-size:11px;color:var(--grey-600);margin-top:6px;line-height:1.4;">Requiere atención progresiva</div>
+      </div>
+      <div style="background:var(--grey-100);padding:14px;border-top:4px solid #6FA858;">
+        <div style="font-size:28px;font-weight:800;color:#6FA858;">4</div>
+        <div style="font-size:11px;color:var(--grey-600);margin-top:4px;font-weight:600;">BUENO</div>
+        <div style="font-size:11px;color:var(--grey-600);margin-top:6px;line-height:1.4;">No requiere revisión</div>
+      </div>
+      <div style="background:var(--grey-100);padding:14px;border-top:4px solid #2E7D4F;">
+        <div style="font-size:28px;font-weight:800;color:#2E7D4F;">5</div>
+        <div style="font-size:11px;color:var(--grey-600);margin-top:4px;font-weight:600;">EXCELENTE</div>
+        <div style="font-size:11px;color:var(--grey-600);margin-top:6px;line-height:1.4;">Cerca de la perfección</div>
+      </div>
+    </div>
+    <div class="mt-7 grid grid-cols-2 gap-6">
+      <div>
+        <h3 class="deck-h3">Eje complementario · Prioridad × Esfuerzo</h3>
+        <p style="font-size:13px;color:var(--grey-600);margin-top:6px;">Cada hallazgo se etiqueta también con un par (Prioridad, Esfuerzo) en escala <strong>Baja / Media / Alta</strong>. La intersección dibuja la matriz de actuación.</p>
+        <table style="width:100%;margin-top:10px;font-size:11px;border-collapse:collapse;">
+          <tr><td></td><th style="background:var(--navy);color:#fff;padding:5px;">Esf. Bajo</th><th style="background:var(--navy);color:#fff;padding:5px;">Esf. Medio</th><th style="background:var(--navy);color:#fff;padding:5px;">Esf. Alto</th></tr>
+          <tr><th style="background:var(--navy);color:#fff;padding:5px;">Prio. Alta</th><td style="background:#2E7D4F;color:#fff;padding:8px;text-align:center;font-weight:700;">QUICK WIN</td><td style="background:#6FA858;color:#fff;padding:8px;text-align:center;font-weight:700;">Hacer ya</td><td style="background:#D4A226;color:#fff;padding:8px;text-align:center;font-weight:700;">Planificar</td></tr>
+          <tr><th style="background:var(--navy);color:#fff;padding:5px;">Prio. Media</th><td style="background:#6FA858;color:#fff;padding:8px;text-align:center;font-weight:700;">Aprovechar</td><td style="background:#D4A226;color:#fff;padding:8px;text-align:center;font-weight:700;">Roadmap</td><td style="background:#D87A2C;color:#fff;padding:8px;text-align:center;font-weight:700;">Diferir</td></tr>
+          <tr><th style="background:var(--navy);color:#fff;padding:5px;">Prio. Baja</th><td style="background:#D4A226;color:#fff;padding:8px;text-align:center;font-weight:700;">Si toca</td><td style="background:#D87A2C;color:#fff;padding:8px;text-align:center;font-weight:700;">Descartar</td><td style="background:#B8332E;color:#fff;padding:8px;text-align:center;font-weight:700;">No tocar</td></tr>
+        </table>
+      </div>
+      <div>
+        <h3 class="deck-h3">Ponderación del Final Score</h3>
+        <p style="font-size:13px;color:var(--grey-600);margin-top:6px;">El score agregado pondera las dimensiones para reflejar su impacto real en producción:</p>
+        <div style="margin-top:10px;font-size:12px;">
+          <div class="flex items-center gap-3 mb-2"><div style="width:120px;color:var(--grey-600);">Seguridad</div><div style="background:var(--grey-200);flex:1;height:14px;border-radius:3px;overflow:hidden;"><div style="background:var(--coral);height:100%;width:25%;"></div></div><div style="width:36px;text-align:right;font-weight:600;">25%</div></div>
+          <div class="flex items-center gap-3 mb-2"><div style="width:120px;color:var(--grey-600);">Modernización</div><div style="background:var(--grey-200);flex:1;height:14px;border-radius:3px;overflow:hidden;"><div style="background:var(--coral);height:100%;width:20%;"></div></div><div style="width:36px;text-align:right;font-weight:600;">20%</div></div>
+          <div class="flex items-center gap-3 mb-2"><div style="width:120px;color:var(--grey-600);">Calidad &amp; tests</div><div style="background:var(--grey-200);flex:1;height:14px;border-radius:3px;overflow:hidden;"><div style="background:var(--coral);height:100%;width:20%;"></div></div><div style="width:36px;text-align:right;font-weight:600;">20%</div></div>
+          <div class="flex items-center gap-3 mb-2"><div style="width:120px;color:var(--grey-600);">Arquitectura</div><div style="background:var(--grey-200);flex:1;height:14px;border-radius:3px;overflow:hidden;"><div style="background:var(--coral);height:100%;width:15%;"></div></div><div style="width:36px;text-align:right;font-weight:600;">15%</div></div>
+          <div class="flex items-center gap-3 mb-2"><div style="width:120px;color:var(--grey-600);">Observabilidad</div><div style="background:var(--grey-200);flex:1;height:14px;border-radius:3px;overflow:hidden;"><div style="background:var(--coral);height:100%;width:10%;"></div></div><div style="width:36px;text-align:right;font-weight:600;">10%</div></div>
+          <div class="flex items-center gap-3 mb-2"><div style="width:120px;color:var(--grey-600);">Documentación</div><div style="background:var(--grey-200);flex:1;height:14px;border-radius:3px;overflow:hidden;"><div style="background:var(--coral);height:100%;width:10%;"></div></div><div style="width:36px;text-align:right;font-weight:600;">10%</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="slide-foot">Metodología · escala 1–5</div>
+  <div class="slide-num">04</div>
+</section>
+
+<!-- SLIDE 5 — RESUMEN EJECUTIVO -->
+<section class="slide" id="s5">
+  <div class="slide-content">
+    <div class="eyebrow">03 · Resumen ejecutivo</div>
+    <h2 class="deck-h2 mt-1">Los tres titulares</h2>
+    <div class="accent-bar mt-3 mb-6"></div>
+    <div class="grid grid-cols-3 gap-5" style="flex:1;">
+      <div style="background:linear-gradient(135deg,var(--navy),var(--navy-soft));color:#fff;padding:24px;border-radius:8px;display:flex;flex-direction:column;">
+        <div style="font-size:60px;font-weight:800;line-height:1;">64%</div>
+        <div style="font-size:13px;opacity:.8;margin-top:8px;letter-spacing:.05em;">DEL ECOSISTEMA YA EN<br/>JAVA 21 + SPRING BOOT 3.X</div>
+        <div style="margin-top:auto;font-size:13px;line-height:1.55;padding-top:14px;border-top:1px solid rgba(255,255,255,.2);">
+          18 de 28 servicios modernizados. Quedan 10 servicios por migrar, entre ellos los dos más grandes del ecosistema (<strong>mst</strong> y <strong>msu</strong>).
+        </div>
+      </div>
+      <div style="background:linear-gradient(135deg,var(--coral),#b85055);color:#fff;padding:24px;border-radius:8px;display:flex;flex-direction:column;">
+        <div style="font-size:60px;font-weight:800;line-height:1;">86%</div>
+        <div style="font-size:13px;opacity:.95;margin-top:8px;letter-spacing:.05em;">QUALITY GATE EN ROJO<br/>EN SONARCLOUD</div>
+        <div style="margin-top:auto;font-size:13px;line-height:1.55;padding-top:14px;border-top:1px solid rgba(255,255,255,.3);">
+          24 servicios incumplen el Quality Gate. Causas dominantes: exclusiones amplias en Sonar y patrones repetidos de configuración insegura.
+        </div>
+      </div>
+      <div style="background:#1f3a48;color:#fff;padding:24px;border-radius:8px;display:flex;flex-direction:column;">
+        <div style="font-size:60px;font-weight:800;line-height:1;">9</div>
+        <div style="font-size:13px;opacity:.85;margin-top:8px;letter-spacing:.05em;">RESPONSABILIDADES EN UN<br/>MISMO MICROSERVICIO (mst)</div>
+        <div style="margin-top:auto;font-size:13px;line-height:1.55;padding-top:14px;border-top:1px solid rgba(255,255,255,.2);">
+          El servicio <strong>Transaction</strong> concentra sesiones de carga, repostaje, pagos, RFID, suscripciones, admin, WebSocket y conciliación contable contra varios sistemas externos (SAFT, STAR, GIC, SAP). Al parecer es un cuello de botella estructural del backend.
+        </div>
+      </div>
+    </div>
+    <div class="mt-6 grid grid-cols-2 gap-6" style="font-size:13px;color:var(--grey-600);">
+      <div><strong style="color:var(--navy)">Buenas noticias.</strong> El núcleo del ecosistema ya está en Java 21. Servicios pequeños como <em>mssms</em> y <em>msrfid</em> son modelos a replicar (cobertura &gt;90%, configuración limpia, parent moderno).</div>
+      <div><strong style="color:var(--navy)">Por trabajar.</strong> Tres bloques: terminar la migración Java en los 10 restantes, normalizar la configuración común (perfiles de log, alineación Docker/CI, parent POM) y abrir la descomposición funcional de <em>mst</em> y <em>msu</em>.</div>
+    </div>
+  </div>
+  <div class="slide-foot">Resumen ejecutivo</div>
+  <div class="slide-num">05</div>
+</section>
+
+<!-- SLIDE 6 — MAPA FUNCIONAL -->
+<section class="slide" id="s6">
+  <div class="slide-content">
+    <div class="eyebrow">04 · Mapa funcional</div>
+    <h2 class="deck-h2 mt-1">Los 28 microservicios, agrupados en 7 dominios</h2>
+    <div class="accent-bar mt-3 mb-4"></div>
+    <div class="grid grid-cols-4 gap-3 mb-3" style="font-size:11px;">
+      <!-- 1 -->
+      <div style="background:var(--grey-100);border-top:3px solid var(--navy);padding:10px 12px;">
+        <div style="font-size:11px;font-weight:700;color:var(--navy);letter-spacing:.05em;">01 · IDENTIDAD &amp; SEGURIDAD</div>
+        <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:4px;">
+          <span class="pill pill-navy">msa</span><span class="pill pill-navy">msau</span><span class="pill pill-navy">msu</span><span class="pill pill-navy">mscrypt</span>
+        </div>
+        <div style="margin-top:8px;color:var(--grey-600);line-height:1.4;">Auth, registro, custodia de claves, administración</div>
+      </div>
+      <!-- 2 -->
+      <div style="background:var(--grey-100);border-top:3px solid var(--coral);padding:10px 12px;">
+        <div style="font-size:11px;font-weight:700;color:var(--coral);letter-spacing:.05em;">02 · TRANSACCIONAL &amp; PAGOS</div>
+        <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:4px;">
+          <span class="pill pill-coral">mst</span><span class="pill pill-coral">msp</span><span class="pill pill-coral">msfc</span>
+        </div>
+        <div style="margin-top:8px;color:var(--grey-600);line-height:1.4;">Transacciones, pagos, anti-fraude</div>
+      </div>
+      <!-- 3 -->
+      <div style="background:var(--grey-100);border-top:3px solid var(--navy-soft);padding:10px 12px;">
+        <div style="font-size:11px;font-weight:700;color:var(--navy-soft);letter-spacing:.05em;">03 · CARGA ELÉCTRICA / REPOSTAJE</div>
+        <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:4px;">
+          <span class="pill pill-navy">mscp</span><span class="pill pill-navy">mscs</span><span class="pill pill-navy">msb</span><span class="pill pill-navy">mscpo</span><span class="pill pill-navy">msstation</span><span class="pill pill-navy">msrefueling</span>
+        </div>
+        <div style="margin-top:8px;color:var(--grey-600);line-height:1.4;">Puntos de carga, sesiones, OCPI, estaciones, repostaje</div>
+      </div>
+      <!-- 4 -->
+      <div style="background:var(--grey-100);border-top:3px solid var(--coral-soft);padding:10px 12px;">
+        <div style="font-size:11px;font-weight:700;color:var(--coral);letter-spacing:.05em;">04 · TARJETAS</div>
+        <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:4px;">
+          <span class="pill pill-coral">mscm</span><span class="pill pill-coral">msrfid</span><span class="pill pill-coral">msl</span>
+        </div>
+        <div style="margin-top:8px;color:var(--grey-600);line-height:1.4;">Tarjetas fidelidad, RFID, loyalty legacy</div>
+      </div>
+      <!-- 5 -->
+      <div style="background:var(--grey-100);border-top:3px solid var(--navy);padding:10px 12px;">
+        <div style="font-size:11px;font-weight:700;color:var(--navy);letter-spacing:.05em;">05 · FIDELIZACIÓN</div>
+        <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:4px;">
+          <span class="pill pill-navy">mspartner</span><span class="pill pill-navy">msprom</span><span class="pill pill-navy">mssubscriptions</span><span class="pill pill-navy">msvouchers</span>
+        </div>
+        <div style="margin-top:8px;color:var(--grey-600);line-height:1.4;">Alliances, referrals, suscripciones, vouchers</div>
+      </div>
+      <!-- 6 -->
+      <div style="background:var(--grey-100);border-top:3px solid var(--coral);padding:10px 12px;">
+        <div style="font-size:11px;font-weight:700;color:var(--coral);letter-spacing:.05em;">06 · COMUNICACIONES</div>
+        <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:4px;">
+          <span class="pill pill-coral">msmail</span><span class="pill pill-coral">mssms</span><span class="pill pill-coral">msn</span>
+        </div>
+        <div style="margin-top:8px;color:var(--grey-600);line-height:1.4;">Email, SMS, push notifications</div>
+      </div>
+      <!-- 7 -->
+      <div style="background:var(--grey-100);border-top:3px solid var(--navy-soft);padding:10px 12px;">
+        <div style="font-size:11px;font-weight:700;color:var(--navy-soft);letter-spacing:.05em;">07 · INTEGRACIÓN &amp; CONFIG</div>
+        <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:4px;">
+          <span class="pill pill-navy">mspproxy</span><span class="pill pill-navy">msplink</span><span class="pill pill-navy">msv</span><span class="pill pill-navy">mss</span><span class="pill pill-navy">msset</span>
+        </div>
+        <div style="margin-top:8px;color:var(--grey-600);line-height:1.4;">Gateways externos, catálogos, settings</div>
+      </div>
+      <!-- 8: pointer to integrations panel -->
+      <div style="background:linear-gradient(135deg,var(--navy),var(--navy-soft));color:#fff;padding:10px 12px;display:flex;flex-direction:column;justify-content:center;">
+        <div style="font-size:10px;font-weight:700;letter-spacing:.1em;opacity:.7;">EL ECOSISTEMA SE APOYA EN</div>
+        <div style="font-size:24px;font-weight:800;line-height:1.05;margin-top:4px;">10+ integraciones<br/>externas</div>
+        <div style="font-size:10px;opacity:.7;margin-top:6px;">Ver detalle abajo ↓</div>
+      </div>
+    </div>
+    <!-- INTEGRATIONS PANEL -->
+    <div style="background:#fff;border:1px solid var(--grey-200);border-top:3px solid var(--coral);padding:14px 16px;flex:1;">
+      <div class="flex items-center justify-between mb-3">
+        <h3 style="font-size:13px;font-weight:700;color:var(--navy);letter-spacing:.04em;text-transform:uppercase;">Integraciones externas del ecosistema</h3>
+        <span style="font-size:10px;color:var(--grey-400);letter-spacing:.1em;text-transform:uppercase;">Sistemas de los que dependen los 28 servicios</span>
+      </div>
+      <div class="grid grid-cols-3 gap-4" style="font-size:11px;">
+        <div>
+          <div style="font-size:11px;font-weight:700;color:var(--coral);letter-spacing:.05em;margin-bottom:6px;">PAGOS &amp; FINANZAS</div>
+          <ul style="color:var(--grey-700);line-height:1.85;color:var(--grey-600);">
+            <li>· <strong style="color:var(--navy);">SAP</strong> · conciliación contable <span style="color:var(--grey-400);">→ mst</span></li>
+            <li>· <strong style="color:var(--navy);">Ingenico</strong> (OnlinePayments) <span style="color:var(--grey-400);">→ msp</span></li>
+            <li>· <strong style="color:var(--navy);">SIBS</strong> · PSP <span style="color:var(--grey-400);">→ msp</span></li>
+            <li>· <strong style="color:var(--navy);">Paytef</strong> · PSP <span style="color:var(--grey-400);">→ msp</span></li>
+            <li>· <strong style="color:var(--navy);">Cepsa MSPProxy</strong> · facturación <span style="color:var(--grey-400);">→ mspproxy</span></li>
+          </ul>
+        </div>
+        <div>
+          <div style="font-size:11px;font-weight:700;color:var(--coral);letter-spacing:.05em;margin-bottom:6px;">IDENTIDAD &amp; CRM</div>
+          <ul style="color:var(--grey-700);line-height:1.85;color:var(--grey-600);">
+            <li>· <strong style="color:var(--navy);">AEAT</strong> · DNI/NIE vía SOAP <span style="color:var(--grey-400);">→ msu</span></li>
+            <li>· <strong style="color:var(--navy);">SiteMinder</strong> · SSO <span style="color:var(--grey-400);">→ msu</span></li>
+            <li>· <strong style="color:var(--navy);">Polaris CRM</strong> · clientes y loyalty <span style="color:var(--grey-400);">→ msu, mscm, msl, mspartner, mss, msvouchers</span></li>
+            <li>· <strong style="color:var(--navy);">XmartServices</strong> · loyalty legacy <span style="color:var(--grey-400);">→ msu, mscm, msl</span></li>
+            <li>· <strong style="color:var(--navy);">reCAPTCHA</strong> · anti-bot <span style="color:var(--grey-400);">→ msu</span></li>
+          </ul>
+        </div>
+        <div>
+          <div style="font-size:11px;font-weight:700;color:var(--coral);letter-spacing:.05em;margin-bottom:6px;">MOVILIDAD &amp; CLOUD</div>
+          <ul style="color:var(--grey-700);line-height:1.85;color:var(--grey-600);">
+            <li>· <strong style="color:var(--navy);">Hubject</strong> · OCPI roaming <span style="color:var(--grey-400);">→ msb</span></li>
+            <li>· <strong style="color:var(--navy);">Diebold PLINK</strong> · gateway carga <span style="color:var(--grey-400);">→ msplink</span></li>
+            <li>· <strong style="color:var(--navy);">AWS</strong> · SES, Pinpoint, OpenSearch, S3 <span style="color:var(--grey-400);">→ msmail, mssms, mscp, msstation, mscrypt</span></li>
+            <li>· <strong style="color:var(--navy);">Firebase FCM</strong> · push <span style="color:var(--grey-400);">→ msn</span></li>
+            <li>· <strong style="color:var(--navy);">Google Geocoding</strong> · maps <span style="color:var(--grey-400);">→ mscp, msstation</span></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="slide-foot">Mapa funcional</div>
+  <div class="slide-num">06</div>
+</section>
+
+<!-- SLIDE 7 — FINAL SCORE / SEMÁFORO -->
+<section class="slide" id="s7">
+  <div class="slide-content">
+    <div class="eyebrow">05 · Valoración por dominio</div>
+    <h2 class="deck-h2 mt-1">Salud técnica de cada dominio funcional (sobre 5 estrellas)</h2>
+    <div class="accent-bar mt-3 mb-6"></div>
+    <div class="grid grid-cols-2 gap-10" style="flex:1;">
+      <div style="display:flex;flex-direction:column;justify-content:center;gap:22px;">
+        <div class="flex items-center justify-between gap-6">
+          <div style="font-size:19px;color:var(--grey-800);font-weight:500;">Identidad &amp; Seguridad</div>
+          <div class="stars" style="--pct:56%;font-size:32px;"></div>
+        </div>
+        <div class="flex items-center justify-between gap-6">
+          <div style="font-size:19px;color:var(--grey-800);font-weight:500;">Transaccional &amp; Pagos</div>
+          <div class="stars" style="--pct:48%;font-size:32px;"></div>
+        </div>
+        <div class="flex items-center justify-between gap-6">
+          <div style="font-size:19px;color:var(--grey-800);font-weight:500;">Carga eléctrica / Repostaje</div>
+          <div class="stars" style="--pct:62%;font-size:32px;"></div>
+        </div>
+        <div class="flex items-center justify-between gap-6">
+          <div style="font-size:19px;color:var(--grey-800);font-weight:500;">Tarjetas</div>
+          <div class="stars" style="--pct:68%;font-size:32px;"></div>
+        </div>
+        <div class="flex items-center justify-between gap-6">
+          <div style="font-size:19px;color:var(--grey-800);font-weight:500;">Fidelización</div>
+          <div class="stars" style="--pct:66%;font-size:32px;"></div>
+        </div>
+        <div class="flex items-center justify-between gap-6">
+          <div style="font-size:19px;color:var(--grey-800);font-weight:500;">Comunicaciones</div>
+          <div class="stars" style="--pct:78%;font-size:32px;"></div>
+        </div>
+        <div class="flex items-center justify-between gap-6">
+          <div style="font-size:19px;color:var(--grey-800);font-weight:500;">Integración &amp; Config</div>
+          <div class="stars" style="--pct:60%;font-size:32px;"></div>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;justify-content:center;">
+        <p style="font-size:15px;color:var(--grey-600);line-height:1.65;">El bloque <strong style="color:var(--navy);">Comunicaciones</strong> es la referencia del ecosistema: servicios pequeños, contenidos, con buena cobertura y configuración limpia (mssms, msn, msmail).</p>
+        <p style="font-size:15px;color:var(--grey-600);line-height:1.65;margin-top:16px;">El bloque <strong style="color:var(--navy);">Transaccional &amp; Pagos</strong> es el que más margen de mejora tiene, principalmente por la situación específica de <em>mst</em> y <em>msfc</em>, los dos servicios con stack más antiguo del ecosistema.</p>
+        <p style="font-size:15px;color:var(--grey-600);line-height:1.65;margin-top:16px;">El resto de bloques se sitúa en torno a una valoración intermedia: una <strong style="color:var(--navy);">base sólida</strong> con áreas concretas para trabajar de forma estructurada.</p>
+        <div style="margin-top:24px;padding:12px 14px;background:var(--grey-100);border-left:3px solid var(--coral);font-size:12px;color:var(--grey-600);line-height:1.5;">
+          Cada estrella equivale a un nivel de la escala 1–5 vista en la slide de metodología. Las puntuaciones ponderan seguridad, modernización, calidad, arquitectura, observabilidad y documentación.
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="slide-foot">Valoración por dominio</div>
+  <div class="slide-num">07</div>
+</section>
+
+<!-- SLIDE 8 — DASHBOARD MODERNIZACIÓN -->
+<section class="slide" id="s8">
+  <div class="slide-content">
+    <div class="eyebrow">06 · Dashboard 1</div>
+    <h2 class="deck-h2 mt-1">Estado de modernización del stack</h2>
+    <div class="accent-bar mt-3 mb-5"></div>
+    <div class="grid grid-cols-3 gap-5 mb-5">
+      <div class="kpi-card"><div class="kpi-num">18 / 28</div><div class="kpi-lbl">En Java 21 + Spring Boot 3.x</div></div>
+      <div class="kpi-card" style="border-color:var(--amber);"><div class="kpi-num" style="color:var(--amber);">8 / 28</div><div class="kpi-lbl">Aún en Java 11 / Spring Boot 2.x</div></div>
+      <div class="kpi-card" style="border-color:var(--red);"><div class="kpi-num" style="color:var(--red);">2 / 28</div><div class="kpi-lbl">Stack atípico (parent custom)</div></div>
+    </div>
+    <div class="grid grid-cols-2 gap-5" style="flex:1;">
+      <div style="background:#fff;border:1px solid var(--grey-200);border-radius:6px;padding:16px;display:flex;flex-direction:column;">
+        <h3 class="deck-h3 mb-3">Distribución de versiones</h3>
+        <!-- segmented bar -->
+        <div style="display:flex;height:42px;border-radius:6px;overflow:hidden;box-shadow:inset 0 0 0 1px rgba(0,0,0,.05);">
+          <div title="Java 21 + Spring Boot 3.x" style="flex:18;background:var(--navy);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:16px;">18</div>
+          <div title="Java 11 + Spring Boot 2.x" style="flex:8;background:var(--coral);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;">8</div>
+          <div title="Stack atípico" style="flex:2;background:var(--amber);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;">2</div>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--grey-400);margin-top:4px;letter-spacing:.05em;">
+          <span>0</span><span>28 microservicios</span>
+        </div>
+        <!-- legend / detail rows -->
+        <div style="display:flex;flex-direction:column;gap:10px;margin-top:18px;">
+          <div class="flex items-center gap-3">
+            <span style="width:14px;height:14px;background:var(--navy);border-radius:3px;flex-shrink:0;"></span>
+            <span style="font-size:13px;color:var(--grey-800);"><strong>Java 21 + Spring Boot 3.x</strong></span>
+            <span style="margin-left:auto;font-size:13px;color:var(--grey-600);font-variant-numeric:tabular-nums;"><strong style="color:var(--navy);">18</strong> servicios · 64%</span>
+          </div>
+          <div class="flex items-center gap-3">
+            <span style="width:14px;height:14px;background:var(--coral);border-radius:3px;flex-shrink:0;"></span>
+            <span style="font-size:13px;color:var(--grey-800);"><strong>Java 11 + Spring Boot 2.x</strong></span>
+            <span style="margin-left:auto;font-size:13px;color:var(--grey-600);font-variant-numeric:tabular-nums;"><strong style="color:var(--coral);">8</strong> servicios · 29%</span>
+          </div>
+          <div class="flex items-center gap-3">
+            <span style="width:14px;height:14px;background:var(--amber);border-radius:3px;flex-shrink:0;"></span>
+            <span style="font-size:13px;color:var(--grey-800);"><strong>Stack atípico</strong> <span style="color:var(--grey-400);">(parent custom)</span></span>
+            <span style="margin-left:auto;font-size:13px;color:var(--grey-600);font-variant-numeric:tabular-nums;"><strong style="color:var(--amber);">2</strong> servicios · 7%</span>
+          </div>
+        </div>
+        <div style="margin-top:auto;padding-top:14px;border-top:1px solid var(--grey-200);font-size:11px;color:var(--grey-600);line-height:1.5;">
+          El <strong style="color:var(--navy);">64% del ecosistema</strong> ya está en stack moderno. Los 10 servicios pendientes incluyen los dos más grandes (<em>mst</em> y <em>msu</em>) y el más obsoleto (<em>msfc</em>).
+        </div>
+      </div>
+      <div>
+        <h3 class="deck-h3 mb-2">Top 5 servicios por urgencia de actualización</h3>
+        <table class="data-tbl" style="font-size:11px;">
+          <thead><tr><th>#</th><th>Servicio</th><th>Stack</th><th>Estado rama migración</th><th>Coste</th></tr></thead>
+          <tbody>
+            <tr><td>1</td><td><strong>mst</strong></td><td>Java 11 · SB 2.x</td><td><span class="pill pill-red">Sin rama</span></td><td>500+ h</td></tr>
+            <tr><td>2</td><td><strong>msu</strong></td><td>Java 11 · SB 2.x</td><td><span class="pill pill-red">Sin rama</span></td><td>~300 h</td></tr>
+            <tr><td>3</td><td>msfc</td><td>Java 11 · SB 2.1.5</td><td><span class="pill pill-amber">49↑ / 1↓</span></td><td>~80 h</td></tr>
+            <tr><td>4</td><td>msb</td><td>Java 11 · SB 2.x</td><td><span class="pill pill-amber">50 commits detrás</span></td><td>~160 h</td></tr>
+            <tr><td>5</td><td>msv</td><td>Java 11 · parent custom</td><td><span class="pill pill-amber">En curso</span></td><td>~80 h</td></tr>
+          </tbody>
+        </table>
+        <div style="margin-top:14px;background:var(--grey-100);padding:10px 12px;border-left:3px solid var(--coral);font-size:12px;color:var(--grey-600);line-height:1.5;">
+          <strong style="color:var(--navy)">Bloqueantes transversales:</strong> migración <code style="font-size:10px;">javax.*</code> → <code style="font-size:10px;">jakarta.*</code>, subida del <em>microservice-parent</em>, sustitución de <em>feign-client2</em> → <em>feign-client3</em>, Hibernate 5 → 6 y MariaDB JDBC 2.x → 3.x.
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="slide-foot">Dashboard · Modernización</div>
+  <div class="slide-num">08</div>
+</section>
+
+<!-- SLIDE 9 — DASHBOARD CALIDAD -->
+<section class="slide" id="s9">
+  <div class="slide-content">
+    <div class="eyebrow">07 · Dashboard 2</div>
+    <h2 class="deck-h2 mt-1">Calidad de código y cobertura</h2>
+    <div class="accent-bar mt-3 mb-5"></div>
+    <div class="grid grid-cols-3 gap-4 mb-5">
+      <div class="kpi-card" style="border-color:var(--red);"><div class="kpi-num" style="color:var(--red);">24</div><div class="kpi-lbl">Quality Gate FAILED</div></div>
+      <div class="kpi-card" style="border-color:var(--green);"><div class="kpi-num" style="color:var(--green);">2</div><div class="kpi-lbl">Quality Gate PASSED</div></div>
+      <div class="kpi-card"><div class="kpi-num">68%</div><div class="kpi-lbl">Cobertura media reportada</div></div>
+    </div>
+    <div class="grid grid-cols-2 gap-5" style="flex:1;">
+      <div style="background:#fff;border:1px solid var(--grey-200);border-radius:6px;padding:14px;display:flex;flex-direction:column;">
+        <h3 class="deck-h3 mb-3">Bottom 15 por cobertura <span style="font-size:10px;color:var(--grey-400);font-weight:400;letter-spacing:0;">— 6 sin proyecto en Sonar, sin métricas</span></h3>
+        <div style="display:flex;flex-direction:column;gap:5px;font-size:11px;">
+          <div class="flex items-center gap-3"><div style="width:108px;color:var(--grey-700);">mscp <span style="color:var(--grey-400);">*</span></div><div style="background:repeating-linear-gradient(45deg,var(--grey-200),var(--grey-200) 4px,#ECEEF1 4px,#ECEEF1 8px);flex:1;height:14px;border-radius:3px;overflow:hidden;"></div><div style="width:42px;text-align:right;font-weight:600;color:var(--grey-400);">—</div></div>
+          <div class="flex items-center gap-3"><div style="width:108px;color:var(--grey-700);">msv <span style="color:var(--grey-400);">*</span></div><div style="background:repeating-linear-gradient(45deg,var(--grey-200),var(--grey-200) 4px,#ECEEF1 4px,#ECEEF1 8px);flex:1;height:14px;border-radius:3px;overflow:hidden;"></div><div style="width:42px;text-align:right;font-weight:600;color:var(--grey-400);">—</div></div>
+          <div class="flex items-center gap-3"><div style="width:108px;color:var(--grey-700);">msfc <span style="color:var(--grey-400);">*</span></div><div style="background:repeating-linear-gradient(45deg,var(--grey-200),var(--grey-200) 4px,#ECEEF1 4px,#ECEEF1 8px);flex:1;height:14px;border-radius:3px;overflow:hidden;"></div><div style="width:42px;text-align:right;font-weight:600;color:var(--grey-400);">—</div></div>
+          <div class="flex items-center gap-3"><div style="width:108px;color:var(--grey-700);">msprom <span style="color:var(--grey-400);">*</span></div><div style="background:repeating-linear-gradient(45deg,var(--grey-200),var(--grey-200) 4px,#ECEEF1 4px,#ECEEF1 8px);flex:1;height:14px;border-radius:3px;overflow:hidden;"></div><div style="width:42px;text-align:right;font-weight:600;color:var(--grey-400);">—</div></div>
+          <div class="flex items-center gap-3"><div style="width:108px;color:var(--grey-700);">mscpo <span style="color:var(--grey-400);">*</span></div><div style="background:repeating-linear-gradient(45deg,var(--grey-200),var(--grey-200) 4px,#ECEEF1 4px,#ECEEF1 8px);flex:1;height:14px;border-radius:3px;overflow:hidden;"></div><div style="width:42px;text-align:right;font-weight:600;color:var(--grey-400);">—</div></div>
+          <div class="flex items-center gap-3"><div style="width:108px;color:var(--grey-700);">mss <span style="color:var(--grey-400);">*</span></div><div style="background:repeating-linear-gradient(45deg,var(--grey-200),var(--grey-200) 4px,#ECEEF1 4px,#ECEEF1 8px);flex:1;height:14px;border-radius:3px;overflow:hidden;"></div><div style="width:42px;text-align:right;font-weight:600;color:var(--grey-400);">—</div></div>
+          <div class="flex items-center gap-3"><div style="width:108px;color:var(--grey-700);">mscrypt</div><div style="background:var(--grey-200);flex:1;height:14px;border-radius:3px;overflow:hidden;"><div style="background:#D26F73;height:100%;width:30.9%;"></div></div><div style="width:42px;text-align:right;font-weight:600;color:#B8332E;">31%</div></div>
+          <div class="flex items-center gap-3"><div style="width:108px;color:var(--grey-700);">msl</div><div style="background:var(--grey-200);flex:1;height:14px;border-radius:3px;overflow:hidden;"><div style="background:#D26F73;height:100%;width:49.9%;"></div></div><div style="width:42px;text-align:right;font-weight:600;color:#B8332E;">50%</div></div>
+          <div class="flex items-center gap-3"><div style="width:108px;color:var(--grey-700);">mscs</div><div style="background:var(--grey-200);flex:1;height:14px;border-radius:3px;overflow:hidden;"><div style="background:#D26F73;height:100%;width:50.5%;"></div></div><div style="width:42px;text-align:right;font-weight:600;color:#B8332E;">51%</div></div>
+          <div class="flex items-center gap-3"><div style="width:108px;color:var(--grey-700);">msb</div><div style="background:var(--grey-200);flex:1;height:14px;border-radius:3px;overflow:hidden;"><div style="background:#D26F73;height:100%;width:51.4%;"></div></div><div style="width:42px;text-align:right;font-weight:600;color:#B8332E;">51%</div></div>
+          <div class="flex items-center gap-3"><div style="width:108px;color:var(--grey-700);">msrefueling</div><div style="background:var(--grey-200);flex:1;height:14px;border-radius:3px;overflow:hidden;"><div style="background:#E0A030;height:100%;width:60.8%;"></div></div><div style="width:42px;text-align:right;font-weight:600;color:#B97A0E;">61%</div></div>
+          <div class="flex items-center gap-3"><div style="width:108px;color:var(--grey-700);">msp</div><div style="background:var(--grey-200);flex:1;height:14px;border-radius:3px;overflow:hidden;"><div style="background:#E0A030;height:100%;width:63.3%;"></div></div><div style="width:42px;text-align:right;font-weight:600;color:#B97A0E;">63%</div></div>
+          <div class="flex items-center gap-3"><div style="width:108px;color:var(--grey-700);">msmail</div><div style="background:var(--grey-200);flex:1;height:14px;border-radius:3px;overflow:hidden;"><div style="background:#E0A030;height:100%;width:64.2%;"></div></div><div style="width:42px;text-align:right;font-weight:600;color:#B97A0E;">64%</div></div>
+          <div class="flex items-center gap-3"><div style="width:108px;color:var(--grey-700);">msplink</div><div style="background:var(--grey-200);flex:1;height:14px;border-radius:3px;overflow:hidden;"><div style="background:#E0A030;height:100%;width:65.7%;"></div></div><div style="width:42px;text-align:right;font-weight:600;color:#B97A0E;">66%</div></div>
+          <div class="flex items-center gap-3"><div style="width:108px;color:var(--grey-700);">mspproxy</div><div style="background:var(--grey-200);flex:1;height:14px;border-radius:3px;overflow:hidden;"><div style="background:#E0A030;height:100%;width:72.5%;"></div></div><div style="width:42px;text-align:right;font-weight:600;color:#B97A0E;">73%</div></div>
+        </div>
+        <div style="font-size:10px;color:var(--grey-400);margin-top:6px;font-style:italic;">* sin proyecto en SonarCloud · 13 servicios restantes (mst 74.5%, msstation 76%, msset 76%, msa 80%, msrfid 83%, msu 86%, msvouchers 87%, mspartner 89%, mssms 90%, msau 91%, mssubscriptions 92%, mscm 93.6%, msn 96%) entre 74% y 96%.</div>
+        <div style="margin-top:auto;padding-top:10px;display:flex;gap:14px;font-size:10px;color:var(--grey-600);">
+          <span class="flex items-center gap-1"><span style="width:10px;height:10px;border-radius:2px;background:#3FA776;"></span> ≥ 80%</span>
+          <span class="flex items-center gap-1"><span style="width:10px;height:10px;border-radius:2px;background:#E0A030;"></span> 60–80%</span>
+          <span class="flex items-center gap-1"><span style="width:10px;height:10px;border-radius:2px;background:#D26F73;"></span> &lt; 60%</span>
+        </div>
+      </div>
+      <div>
+        <h3 class="deck-h3 mb-2">Patrones de deuda más frecuentes <span style="font-size:10px;color:var(--grey-400);font-weight:400;letter-spacing:0;">— de más crítico a mejor</span></h3>
+        <table class="data-tbl" style="font-size:11px;">
+          <thead><tr><th>Patrón</th><th style="width:90px;">Afectados</th><th style="width:104px;">Nivel</th></tr></thead>
+          <tbody>
+            <tr><td>Exclusiones Sonar amplias que inflan cobertura</td><td>22 / 28</td><td><span class="rating-label rating-2">ALTO</span></td></tr>
+            <tr><td>Clases utility &gt; 500 LOC y CC &gt; 15</td><td>11 / 28</td><td><span class="rating-label rating-2">ALTO</span></td></tr>
+            <tr><td><span class="tip" data-tip="Servicios afectados: msb depende de chargepoint-feign-client2:1.2.4-SNAPSHOT en producción, y msfc compila el artefacto como 0.0.1-SNAPSHOT directamente en prod. Los SNAPSHOT no son reproducibles: dos despliegues con el mismo POM pueden traer bytecode distinto si el artefacto SNAPSHOT cambió en el repositorio entre despliegues, lo que hace casi imposible rollback fiable o diagnóstico de regresiones.">Artefactos SNAPSHOT en producción (msb, msfc)</span></td><td>2 / 28</td><td><span class="rating-label rating-2">ALTO</span></td></tr>
+            <tr><td>OpenAPI inconsistente (v1 hardcoded + v2/v3)</td><td>14 / 28</td><td><span class="rating-label rating-3">MEDIO</span></td></tr>
+            <tr><td>FIXMEs/TODOs activos sin ticket asociado</td><td>9 / 28</td><td><span class="rating-label rating-3">MEDIO</span></td></tr>
+            <tr><td>Ramas <em>feature</em> abandonadas (&gt;50 commits)</td><td>5 / 28</td><td><span class="rating-label rating-3">MEDIO</span></td></tr>
+            <tr><td>Parent POM no estándar</td><td>4 / 28</td><td><span class="rating-label rating-3">MEDIO</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="slide-foot">Dashboard · Calidad</div>
+  <div class="slide-num">09</div>
+</section>
+
+<!-- SLIDE 10 — DASHBOARD HIGIENE DE LOGGING Y CONFIGURACIÓN -->
+<section class="slide" id="s10">
+  <div class="slide-content">
+    <div class="eyebrow">08 · Dashboard 3</div>
+    <h2 class="deck-h2 mt-1">Higiene de logging y configuración</h2>
+    <div class="accent-bar mt-3 mb-5"></div>
+    <p style="font-size:13px;color:var(--grey-600);max-width:880px;margin-bottom:14px;">Patrones de configuración heredados de la fase inicial del proyecto. La superficie de API está protegida en el gateway, así que el foco aquí está en <strong>limpiar los logs en producción y estandarizar la configuración común</strong>.</p>
+    <div class="grid grid-cols-2 gap-5" style="flex:1;">
+      <div>
+        <h3 class="deck-h3 mb-2">A normalizar</h3>
+        <div style="display:flex;flex-direction:column;gap:8px;font-size:12px;">
+          <div style="background:var(--grey-100);padding:10px 12px;border-left:3px solid #D87A2C;">
+            <div style="font-weight:600;color:var(--navy);">Mejorar trazas y luego eliminar <code style="font-size:10px;">show-sql: true</code> en no-locales</div>
+            <div style="color:var(--grey-600);margin-top:2px;">Hoy las consultas SQL completas se imprimen en logs de dev, qa y prod — ruido y, en casos puntuales, valores de negocio en CloudWatch. Primero homogeneizar trazas y niveles de log; entonces retirar <code style="font-size:10px;">show-sql</code> es trivial.</div>
+            <div style="color:var(--grey-400);margin-top:4px;font-size:10px;">Aplicable en varios servicios</div>
+          </div>
+          <div style="background:var(--grey-100);padding:10px 12px;border-left:3px solid #D4A226;">
+            <div style="font-weight:600;color:var(--navy);"><span class="tip" data-tip="AWS dejó de mantener el SDK v1 (com.amazonaws.*) el 31-dic-2024: sin parches de seguridad, sin fixes y sin nuevas features. El SDK v2 (software.amazon.awssdk.*) lleva activo desde nov-2018 con soporte indefinido, cliente HTTP moderno, soporte asíncrono nativo y menor footprint.">AWS SDK v1 (EOL desde dic-2024)</span></div>
+            <div style="color:var(--grey-600);margin-top:2px;">Presente en <em>msmail</em> (SES), <em>mssms</em> (Pinpoint) y <em>mscrypt</em> (config). Migración a SDK v2 recomendada para mantener soporte.</div>
+            <div style="color:var(--grey-400);margin-top:4px;font-size:10px;">3 servicios</div>
+          </div>
+          <div style="background:var(--grey-100);padding:10px 12px;border-left:3px solid #D4A226;">
+            <div style="font-weight:600;color:var(--navy);">Custodia de claves en <em>mscrypt</em></div>
+            <div style="color:var(--grey-600);margin-top:2px;">Cobertura de tests al 31% en un servicio que custodia claves de usuario. Conviene reforzar las pruebas y subir el SDK a v2.</div>
+            <div style="color:var(--grey-400);margin-top:4px;font-size:10px;">1 servicio crítico</div>
+          </div>
+        </div>
+      </div>
+      <div>
+        <h3 class="deck-h3 mb-2">Buena base ya en sitio</h3>
+        <div style="display:flex;flex-direction:column;gap:8px;font-size:12px;">
+          <div style="background:var(--grey-100);padding:10px 12px;border-left:3px solid #2E7D4F;">
+            <div style="font-weight:600;color:var(--navy);">Acceso a la API protegido en el gateway</div>
+            <div style="color:var(--grey-600);margin-top:2px;">La superficie de los 28 microservicios no es accesible directamente desde Internet: el gateway corporativo filtra y autentica el tráfico de entrada.</div>
+          </div>
+          <div style="background:var(--grey-100);padding:10px 12px;border-left:3px solid #2E7D4F;">
+            <div style="font-weight:600;color:var(--navy);">Autenticación centralizada con JWT</div>
+            <div style="color:var(--grey-600);margin-top:2px;"><em>msau</em> emite y valida tokens JWT para todo el ecosistema; <em>mssubscriptions</em> usa además OAuth2 como referencia.</div>
+          </div>
+          <div style="background:var(--grey-100);padding:10px 12px;border-left:3px solid #2E7D4F;">
+            <div style="font-weight:600;color:var(--navy);">Secretos inyectados desde Vault / entorno</div>
+            <div style="color:var(--grey-600);margin-top:2px;">Las contraseñas reales viajan por variables de entorno y no por el repositorio; los valores que aparecen en <code style="font-size:10px;">bootstrap.yml</code> son placeholders de desarrollo.</div>
+          </div>
+          <div style="background:var(--grey-100);padding:10px 12px;border-left:3px solid #2E7D4F;">
+            <div style="font-weight:600;color:var(--navy);">Migraciones de BD bajo control</div>
+            <div style="color:var(--grey-600);margin-top:2px;">Flyway desplegado de forma uniforme en todo el ecosistema; aporta trazabilidad de cambios de esquema y vuelta atrás controlada.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="slide-foot">Dashboard · Higiene de configuración</div>
+  <div class="slide-num">10</div>
+</section>
+
+<!-- SLIDE 11 — DASHBOARD OBSERVABILIDAD -->
+<section class="slide" id="s11">
+  <div class="slide-content">
+    <div class="eyebrow">09 · Dashboard 4</div>
+    <h2 class="deck-h2 mt-1">Operación y observabilidad</h2>
+    <div class="accent-bar mt-3 mb-5"></div>
+    <div class="grid grid-cols-2 gap-6" style="flex:1;">
+      <div style="display:flex;flex-direction:column;">
+        <h3 class="deck-h3 mb-3">Madurez por capacidad</h3>
+        <div class="chart-box" style="height:360px;">
+          <canvas id="chartRadar"></canvas>
+        </div>
+      </div>
+      <div>
+        <h3 class="deck-h3 mb-3">Observaciones clave <span style="font-size:10px;color:var(--grey-400);font-weight:400;letter-spacing:0;">— ordenado de más crítico a mejor</span></h3>
+        <div style="display:flex;flex-direction:column;gap:8px;font-size:12px;">
+          <div style="display:flex;gap:12px;align-items:flex-start;"><span class="rating-label rating-3" style="flex-shrink:0;margin-top:1px;">MEDIO</span><div><strong style="color:var(--navy)">Healthchecks.</strong> Disponibles vía Actuator pero <em>liveness/readiness</em> no diferenciados en la mayoría.</div></div>
+          <div style="display:flex;gap:12px;align-items:flex-start;"><span class="rating-label rating-3" style="flex-shrink:0;margin-top:1px;">MEDIO</span><div><strong style="color:var(--navy)">Logging.</strong> Patrón consistente con Logback y JSON, pero niveles DEBUG aún activos en producción en algunos servicios (mssms, msmail Legacy).</div></div>
+          <div style="display:flex;gap:12px;align-items:flex-start;"><span class="rating-label rating-3" style="flex-shrink:0;margin-top:1px;">MEDIO</span><div><strong style="color:var(--navy)">Inconsistencias Docker/CI.</strong> Cinco servicios construyen el JAR a Java 11 pero ejecutan en JVM 21 (Docker). Hay que alinearlos.</div></div>
+          <div style="display:flex;gap:12px;align-items:flex-start;"><span class="rating-label rating-4" style="flex-shrink:0;margin-top:1px;">BUENO</span><div><strong style="color:var(--navy)">Migraciones de BD.</strong> Flyway desplegado de forma generalizada. Punto a corregir: <code style="font-size:10px;">FlywayConfig.cleanMigrate</code> presente en <em>mscm</em>.</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="slide-foot">Dashboard · Operación</div>
+  <div class="slide-num">11</div>
+</section>
+
+<!-- SLIDE 12 — MATRIZ P×E 3x3 -->
+<section class="slide" id="s12">
+  <div class="slide-content">
+    <div class="eyebrow">09 · Matriz P × E</div>
+    <h2 class="deck-h2 mt-1">Qué atacar primero según prioridad y esfuerzo</h2>
+    <div class="accent-bar mt-3 mb-4"></div>
+    <p style="font-size:12px;color:var(--grey-600);margin-bottom:12px;max-width:980px;">Cada hallazgo de la auditoría se sitúa en una de las nueve celdas según su <strong>prioridad de actuación</strong> y el <strong>esfuerzo</strong> estimado de implementación. El cuadrante superior izquierdo concentra los <em>quick wins</em>; el superior derecho, las inversiones estratégicas del roadmap.</p>
+
+    <!-- 3x3 grid with axis labels -->
+    <div style="display:grid;grid-template-columns:84px repeat(3,1fr);grid-template-rows:28px repeat(3,1fr);gap:8px;flex:1;">
+      <!-- Top axis labels -->
+      <div></div>
+      <div style="display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;letter-spacing:.1em;color:var(--grey-600);text-transform:uppercase;">Esfuerzo Bajo</div>
+      <div style="display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;letter-spacing:.1em;color:var(--grey-600);text-transform:uppercase;">Esfuerzo Medio</div>
+      <div style="display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;letter-spacing:.1em;color:var(--grey-600);text-transform:uppercase;">Esfuerzo Alto</div>
+
+      <!-- Row: Prioridad Alta -->
+      <div style="display:flex;align-items:center;justify-content:center;writing-mode:vertical-rl;transform:rotate(180deg);font-size:10px;font-weight:700;letter-spacing:.1em;color:var(--grey-600);text-transform:uppercase;">Prioridad Alta</div>
+      <!-- Quick Win (verde) -->
+      <div style="background:#E8F5EE;border-left:3px solid #2E7D4F;padding:8px 10px;display:flex;flex-direction:column;">
+        <div style="font-size:10px;font-weight:700;color:#2E7D4F;letter-spacing:.05em;">QUICK WIN</div>
+        <ul style="font-size:11px;color:var(--grey-700);line-height:1.5;margin-top:6px;">
+          <li style="display:flex;align-items:flex-start;gap:6px;"><span style="width:8px;height:8px;border-radius:50%;background:#5F6C76;margin-top:5px;flex-shrink:0;"></span><span class="tip" data-tip="En 5 servicios (msu, mspproxy, mss, msprom, msvouchers) el pipeline de CI compila el JAR a bytecode Java 11 pero el Dockerfile lo ejecuta sobre JVM 21. Funciona por compatibilidad hacia atrás, pero enmascara problemas de migración y desactiva las optimizaciones del runtime moderno.">Alinear Docker / CI a Java 21 (5 micros)</span></li>
+          <li style="display:flex;align-items:flex-start;gap:6px;"><span style="width:8px;height:8px;border-radius:50%;background:#E89DA0;margin-top:5px;flex-shrink:0;"></span><span class="tip" data-tip="FlywayConfig.cleanMigrate() ejecuta clean (DROPS ALL del schema) seguido de migrate (recrea desde scripts). Aunque hoy no se invoque, su sola presencia en el código de producción es una pistola cargada: un flag mal cargado o un cambio mal probado podría activarlo y borrar todas las tarjetas de fidelidad. Es trivial de evitar: borrar la llamada y dejar solo migrate().">Eliminar <code style="font-size:10px;">FlywayConfig.cleanMigrate</code> en mscm</span></li>
+          <li style="display:flex;align-items:flex-start;gap:6px;"><span style="width:8px;height:8px;border-radius:50%;background:#5F6C76;margin-top:5px;flex-shrink:0;"></span><span class="tip" data-tip="La clase MockService (que devuelve vehículos falsos para tests) está en src/main/java y viaja en el JAR productivo de msv. Un flag isMock mal configurado podría activarla y servir datos falsos a usuarios reales sin alarma. Hay que moverla a src/test/java para que solo se compile durante los tests.">Eliminar MockService de producción en msv</span></li>
+        </ul>
+      </div>
+      <!-- Hacer ya (verde-amarillo) -->
+      <div style="background:#F2F7E8;border-left:3px solid #6FA858;padding:8px 10px;display:flex;flex-direction:column;">
+        <div style="font-size:10px;font-weight:700;color:#6FA858;letter-spacing:.05em;">HACER YA</div>
+        <ul style="font-size:11px;color:var(--grey-700);line-height:1.5;margin-top:6px;">
+          <li style="display:flex;align-items:flex-start;gap:6px;"><span style="width:8px;height:8px;border-radius:50%;background:#5F6C76;margin-top:5px;flex-shrink:0;"></span><span class="tip" data-tip="Dos acciones complementarias sobre logs: (1) Mejorar la trazabilidad en los microservicios — patrón consistente, niveles uniformes, correlación entre servicios, eliminación de DEBUG residual en mssms y msmail Legacy. (2) Desactivar spring.jpa.show-sql=true en perfiles no-locales (dev, qa y prod) para evitar volcar SQL con valores de parámetros a CloudWatch — show-sql está activo hoy al menos en msau, mscm, mscp y msu, con riesgo de fuga de PII y de volumen de logs. Se sube a esfuerzo medio porque la parte de trazabilidad requiere acordar formato y propagar cambios en los 28 servicios.">Mejorar trazabilidad en los micros (mejores logs) y desactivar <code style="font-size:10px;">show-sql</code> en no-locales</span></li>
+          <li style="display:flex;align-items:flex-start;gap:6px;"><span style="width:8px;height:8px;border-radius:50%;background:#E0A030;margin-top:5px;flex-shrink:0;"></span><span class="tip" data-tip="El SDK v1 de AWS (com.amazonaws.*) está EOL desde el 31-dic-2024: sin parches de seguridad, sin fixes y sin nuevas features. El SDK v2 (software.amazon.awssdk.*) ofrece cliente HTTP moderno, soporte asíncrono nativo y menor footprint. msmail usa aws-java-sdk-ses 1.12.429, mssms aws-java-sdk-pinpoint 1.12.710 y mscrypt mantiene config v1.">Migrar AWS SDK v1 → v2 (msmail, mssms, mscrypt)</span></li>
+        </ul>
+      </div>
+      <!-- Planificar (amarillo) -->
+      <div style="background:#FBF1DE;border-left:3px solid #D4A226;padding:8px 10px;display:flex;flex-direction:column;">
+        <div style="font-size:10px;font-weight:700;color:#B97A0E;letter-spacing:.05em;">PLANIFICAR (ROADMAP)</div>
+        <ul style="font-size:11px;color:var(--grey-700);line-height:1.5;margin-top:6px;">
+          <li style="display:flex;align-items:flex-start;gap:6px;"><span style="width:8px;height:8px;border-radius:50%;background:#D26F73;margin-top:5px;flex-shrink:0;"></span><span class="tip tip-end" data-tip="Es el servicio más grande del ecosistema: 808 ficheros Java, 36 entidades JPA, 121 scripts Flyway, 109 ficheros con javax.*, 6 librerías feign-client2 y WebSocket/STOMP. No tiene rama de migración abierta. Esfuerzo estimado: 500+ horas. Bloqueante para abrir la descomposición funcional posterior.">Migración Java 21 + SB 3 de <strong>mst</strong></span></li>
+          <li style="display:flex;align-items:flex-start;gap:6px;"><span style="width:8px;height:8px;border-radius:50%;background:#0E3F5C;margin-top:5px;flex-shrink:0;"></span><span class="tip tip-end" data-tip="561 ficheros, 144 con javax.*, 8 librerías feign-client2. Lo más espinoso: integración SOAP/JAX-WS con AEAT para validar DNI/NIE — Spring Boot 3 no incluye JAX-WS, hay que migrar a Apache CXF. Tampoco tiene rama de migración abierta. Esfuerzo estimado: ~300 horas. User.java de 496 LOC convertida en god object.">Migración Java 21 + SB 3 de <strong>msu</strong></span></li>
+          <li style="display:flex;align-items:flex-start;gap:6px;"><span style="width:8px;height:8px;border-radius:50%;background:#1F5878;margin-top:5px;flex-shrink:0;"></span><span class="tip tip-end" data-tip="msb (Broker OCPI/OICP) tiene 461 ficheros, SNAPSHOT en producción (chargepoint-feign-client2:1.2.4-SNAPSHOT) y una rama de migración a Java 21 que lleva 50 commits desfasada respecto a master — necesita rebase antes de mergear. Vulnerabilidades Sonar: 24 (C), 17 bugs (E). HubjectSendRequestUtils tiene complejidad ciclomática 25.">Migración Java 21 + SB 3 de msb</span></li>
+          <li style="display:flex;align-items:flex-start;gap:6px;"><span style="width:8px;height:8px;border-radius:50%;background:#D26F73;margin-top:5px;flex-shrink:0;"></span><span class="tip tip-end" data-tip="msfc (Fraud Control) corre hoy en Spring Boot 2.1.5 con EclipseLink 2.7.9 — el stack más obsoleto del ecosistema, además con artefacto 0.0.1-SNAPSHOT en producción. La rama de migración a Java 21 está 49 commits por delante de master y solo 1 por detrás. Aunque la rama está cerca de mergeable, el esfuerzo real de validación e integración (tests, dependencias EclipseLink, Spring Cloud Greenwich → 2022.x) lo eleva a esfuerzo alto.">Mergear rama de migración Java de msfc</span></li>
+        </ul>
+      </div>
+
+      <!-- Row: Prioridad Media -->
+      <div style="display:flex;align-items:center;justify-content:center;writing-mode:vertical-rl;transform:rotate(180deg);font-size:10px;font-weight:700;letter-spacing:.1em;color:var(--grey-600);text-transform:uppercase;">Prioridad Media</div>
+      <!-- Aprovechar (verde-amarillo) -->
+      <div style="background:#F2F7E8;border-left:3px solid #6FA858;padding:8px 10px;display:flex;flex-direction:column;">
+        <div style="font-size:10px;font-weight:700;color:#6FA858;letter-spacing:.05em;">APROVECHAR</div>
+        <ul style="font-size:11px;color:var(--grey-700);line-height:1.5;margin-top:6px;">
+          <li style="display:flex;align-items:flex-start;gap:6px;"><span style="width:8px;height:8px;border-radius:50%;background:#5F6C76;margin-top:5px;flex-shrink:0;"></span><span class="tip" data-tip="El microservice3-parent tiene versiones dispares por el ecosistema (1.0.6 a 2.0.2) — no hay 'versión bendecida'. Esto significa que actualizaciones de seguridad o de dependencias clave (Spring Boot, Hibernate, Jackson) tardan en propagarse y hay servicios que arrastran librerías vulnerables. Subir todo a 2.0.2 unifica el baseline y simplifica futuras actualizaciones.">Actualizar parent3 a la versión 2.0.2 en servicios atrasados</span></li>
+        </ul>
+      </div>
+      <!-- Roadmap (amarillo) -->
+      <div style="background:#FBF1DE;border-left:3px solid #D4A226;padding:8px 10px;display:flex;flex-direction:column;">
+        <div style="font-size:10px;font-weight:700;color:#B97A0E;letter-spacing:.05em;">ROADMAP</div>
+        <ul style="font-size:11px;color:var(--grey-700);line-height:1.5;margin-top:6px;">
+          <li style="display:flex;align-items:flex-start;gap:6px;"><span style="width:8px;height:8px;border-radius:50%;background:#5F6C76;margin-top:5px;flex-shrink:0;"></span><span class="tip" data-tip="Conviven controllers v1 con @RequestMapping hardcoded y controllers v2/v3 con interfaces generadas por OpenAPI Generator (mscp, mst, msb, msu). Resultado: el contrato API no se puede detectar automáticamente, los clientes generados quedan desincronizados y hay endpoints sin documentación. Migrar los controllers v1 a OpenAPI Generator deja un único contrato versionado.">Unificar OpenAPI (eliminar controllers v1 hardcoded)</span></li>
+        </ul>
+      </div>
+      <!-- Diferir (naranja) -->
+      <div style="background:#F9E5E4;border-left:3px solid #D87A2C;padding:8px 10px;display:flex;flex-direction:column;">
+        <div style="font-size:10px;font-weight:700;color:#B8332E;letter-spacing:.05em;">DIFERIR</div>
+        <ul style="font-size:11px;color:var(--grey-700);line-height:1.5;margin-top:6px;">
+          <li style="display:flex;align-items:flex-start;gap:6px;"><span style="width:8px;height:8px;border-radius:50%;background:#D26F73;margin-top:5px;flex-shrink:0;"></span><span class="tip tip-end" data-tip="mst acumula 9 responsabilidades (sesiones de carga, repostaje, tarjetas bancarias, checkout, RFID, suscripciones, admin, WebSocket, conciliación SAP) y dos utils enormes: InvoiceUtils (1.792 LOC, CC 25) y TransactionUtils (1.589 LOC, CC 22). Proyecto de mediano-largo plazo. Detalle del split en la slide 14. Se difiere porque depende de completar primero la migración Java 21 + SB 3.">Descomposición funcional de <strong>mst</strong></span></li>
+          <li style="display:flex;align-items:flex-start;gap:6px;"><span style="width:8px;height:8px;border-radius:50%;background:#0E3F5C;margin-top:5px;flex-shrink:0;"></span><span class="tip tip-end" data-tip="User.java en msu llega a 496 LOC mezclando login SiteMinder, registro Polaris, OTP, T&C, eConsent GDPR, validación AEAT, reCAPTCHA, transferencias de crédito y KPIs. Es el típico god object que concentra demasiadas responsabilidades sin bounded context claro. Romperlo por responsabilidad mejora cobertura y onboarding, pero exige migración previa a SB 3 para evitar refactorizar dos veces.">Refactor de <code style="font-size:10px;">User.java</code> (god object)</span></li>
+          <li style="display:flex;align-items:flex-start;gap:6px;"><span style="width:8px;height:8px;border-radius:50%;background:#D26F73;margin-top:5px;flex-shrink:0;"></span><span class="tip tip-end" data-tip="msp (Payment) maneja 3 proveedores PSP (Ingenico/OnlinePayments, SIBS, Paytef) en la misma clase: SdkPaymentServiceImpl tiene 600 LOC y SibsPaymentService 599 LOC, todo el routing va por if/switch. Aplicar Strategy + interfaz PaymentProvider permite añadir/retirar PSPs sin tocar el resto y aislar los tests por proveedor.">Consolidar los 3 PSPs de msp tras Strategy</span></li>
+          <li style="display:flex;align-items:flex-start;gap:6px;"><span style="width:8px;height:8px;border-radius:50%;background:#1F5878;margin-top:5px;flex-shrink:0;"></span><span class="tip tip-end" data-tip="mscp (Charge Point) expone v1, v2 y v3 de la API simultáneamente — 12 controllers, ~60 endpoints. Cada versión arrastra su propio mapeo, DTOs y validaciones. Mantener tres APIs en paralelo encarece bugs, duplica tests y enmascara qué clientes usan qué versión. Consolidar exige coordinar con todos los consumidores antes de retirar v1/v2 y migrar contratos OpenAPI — esfuerzo alto por la cantidad de endpoints y la dependencia externa.">Consolidar API v1/v2/v3 de mscp</span></li>
+        </ul>
+      </div>
+
+      <!-- Row: Prioridad Baja -->
+      <div style="display:flex;align-items:center;justify-content:center;writing-mode:vertical-rl;transform:rotate(180deg);font-size:10px;font-weight:700;letter-spacing:.1em;color:var(--grey-600);text-transform:uppercase;">Prioridad Baja</div>
+      <!-- Si toca (amarillo) -->
+      <div style="background:#FBF1DE;border-left:3px solid #D4A226;padding:8px 10px;display:flex;flex-direction:column;">
+        <div style="font-size:10px;font-weight:700;color:#B97A0E;letter-spacing:.05em;">SI TOCA</div>
+        <ul style="font-size:11px;color:var(--grey-700);line-height:1.5;margin-top:6px;">
+          <li style="display:flex;align-items:flex-start;gap:6px;"><span style="width:8px;height:8px;border-radius:50%;background:#E0A030;margin-top:5px;flex-shrink:0;"></span><span class="tip" data-tip="mssms (SMS) corre con root logger en DEBUG en perfiles no-locales. Para un servicio que envía SMS vía AWS Pinpoint, el DEBUG infla CloudWatch con detalle innecesario de cada llamada al SDK. Bajar a INFO es trivial (config en application.yml) pero como mssms es el servicio más pequeño y estable del ecosistema, el riesgo de no hacerlo es bajo.">Bajar nivel DEBUG en mssms</span></li>
+        </ul>
+      </div>
+      <!-- Descartar (naranja) -->
+      <div style="background:#F9E5E4;border-left:3px solid #D87A2C;padding:8px 10px;display:flex;flex-direction:column;">
+        <div style="font-size:10px;font-weight:700;color:#B8332E;letter-spacing:.05em;">DESCARTAR</div>
+        <ul style="font-size:11px;color:var(--grey-700);line-height:1.5;margin-top:6px;">
+          <li style="display:flex;align-items:flex-start;gap:6px;"><span style="width:8px;height:8px;border-radius:50%;background:#E0A030;margin-top:5px;flex-shrink:0;"></span><span class="tip" data-tip="mssms también usa Pinpoint SDK v1, pero a diferencia de msmail/mscrypt es el servicio más pequeño (14 ficheros, 1 endpoint) y con mejor ratio de testing del ecosistema. Esfuerzo de migración alto en proporción al riesgo: el cliente Pinpoint v2 cambia los nombres de DTOs. Se descarta como acción independiente — se aborda cuando toque la oleada general AWS SDK v1→v2.">Migrar Pinpoint SDK v1 → v2 (mssms)</span></li>
+          <li style="display:flex;align-items:flex-start;gap:6px;"><span style="width:8px;height:8px;border-radius:50%;background:#1F5878;margin-top:5px;flex-shrink:0;"></span><span class="tip" data-tip="Feign tiene 4 niveles de logging: NONE, BASIC, HEADERS y FULL. FULL imprime headers + body + tiempo de cada request y response — multiplica el volumen de logs y deja datos en claro (credenciales en headers o PII en bodies). En mscp se usa FULL en perfiles no-locales. Se difiere hasta que la acción de mejora de trazabilidad (Hacer ya) esté en marcha: una vez homogeneizado el patrón de logs, bajar Feign a BASIC en prod es trivial dentro de esa misma oleada.">Bajar nivel Feign logger FULL en mscp <span style="color:var(--grey-400);">(tras mejora de trazas)</span></span></li>
+        </ul>
+      </div>
+      <!-- No tocar (rojo) -->
+      <div style="background:#F4DDDC;border-left:3px solid #B8332E;padding:8px 10px;display:flex;flex-direction:column;">
+        <div style="font-size:10px;font-weight:700;color:#B8332E;letter-spacing:.05em;">NO TOCAR</div>
+        <ul style="font-size:11px;color:var(--grey-700);line-height:1.5;margin-top:6px;">
+          <li style="display:flex;align-items:flex-start;gap:6px;"><span style="width:8px;height:8px;border-radius:50%;background:#5F6C76;margin-top:5px;flex-shrink:0;"></span><span class="tip tip-end" data-tip="mss (Support) usa microservice-parent:1.0.8, un parent atípico que no es ni microservice2- ni microservice3-. Cambiarlo es alto esfuerzo (hay que validar todas las dependencias transitorias) y baja prioridad: mss es pequeño, estable y su rama de migración a Java 21 ya está 14 commits ahead. Cuando se mergee esa rama, el parent3 entra de forma natural.">Migrar mss a microservice3-parent</span></li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Legend -->
+    <div style="margin-top:12px;display:flex;flex-wrap:wrap;gap:14px;font-size:10px;color:var(--grey-600);align-items:center;">
+      <span style="font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:.1em;">Dominio del hallazgo:</span>
+      <span class="flex items-center gap-1"><span style="width:10px;height:10px;border-radius:50%;background:#0E3F5C;"></span> Identidad &amp; Seguridad</span>
+      <span class="flex items-center gap-1"><span style="width:10px;height:10px;border-radius:50%;background:#D26F73;"></span> Transaccional &amp; Pagos</span>
+      <span class="flex items-center gap-1"><span style="width:10px;height:10px;border-radius:50%;background:#1F5878;"></span> Carga eléctrica</span>
+      <span class="flex items-center gap-1"><span style="width:10px;height:10px;border-radius:50%;background:#E89DA0;"></span> Tarjetas</span>
+      <span class="flex items-center gap-1"><span style="width:10px;height:10px;border-radius:50%;background:#3FA776;"></span> Fidelización</span>
+      <span class="flex items-center gap-1"><span style="width:10px;height:10px;border-radius:50%;background:#E0A030;"></span> Comunicaciones</span>
+      <span class="flex items-center gap-1"><span style="width:10px;height:10px;border-radius:50%;background:#5F6C76;"></span> Transversal / Integración</span>
+    </div>
+  </div>
+  <div class="slide-foot">Matriz P × E</div>
+  <div class="slide-num">12</div>
+</section>
+
+<!-- SLIDE 13 — ANÁLISIS POR GRUPO -->
+<section class="slide" id="s13">
+  <div class="slide-content">
+    <div class="eyebrow">11 · Análisis por grupo</div>
+    <h2 class="deck-h2 mt-1">Foto resumen de los 7 dominios</h2>
+    <div class="accent-bar mt-3 mb-4"></div>
+    <table class="data-tbl" style="font-size:11.5px;">
+      <thead><tr>
+        <th>Dominio</th><th><span class="tip" data-tip="Escala 1–5: 1 CRÍTICO (resolver de inmediato) · 2 ALTO (será problema próximamente) · 3 MEDIO (requiere atención progresiva) · 4 BUENO (no requiere revisión) · 5 EXCELENTE (cerca de la perfección)." style="border-bottom-color:#fff;">Score</span></th><th>Java 21</th><th>QG ✓</th><th>Cobertura</th>
+        <th>Highlight positivo</th><th>Foco de mejora</th>
+      </tr></thead>
+      <tbody>
+        <tr><td><strong>Identidad &amp; Seguridad</strong> (4)</td><td><span class="rating-cell rating-3">2.8</span></td><td>3 / 4</td><td>0 / 4</td><td>72%</td>
+            <td>Buen ratio de tests en msau (91%) y msa (80%)</td><td>Mejorar custodia de claves en mscrypt y revisar header x-pass de msau</td></tr>
+        <tr><td><strong>Transaccional &amp; Pagos</strong> (4)</td><td><span class="rating-cell rating-2">2.4</span></td><td>2 / 4</td><td>0 / 4</td><td>62%</td>
+            <td>msrefueling con cobertura razonable</td><td>Migración Java de mst y msfc; descomposición de mst</td></tr>
+        <tr><td><strong>Carga eléctrica</strong> (5)</td><td><span class="rating-cell rating-3">3.1</span></td><td>3 / 5</td><td>0 / 5</td><td>53%</td>
+            <td>mscp y msstation con OpenSearch consolidado</td><td>Unificar API versionada en mscp; cerrar rama de migración de msb</td></tr>
+        <tr><td><strong>Tarjetas</strong> (3)</td><td><span class="rating-cell rating-3">3.4</span></td><td>3 / 3</td><td>0 / 3</td><td>66%</td>
+            <td>msrfid es el modelo del ecosistema (83% cobertura, config limpia)</td><td>Cipher key en mscm y rama abandonada en msl</td></tr>
+        <tr><td><strong>Fidelización</strong> (4)</td><td><span class="rating-cell rating-3">3.3</span></td><td>2 / 4</td><td>0 / 4</td><td>72%</td>
+            <td>mssubscriptions con 92% cobertura y mutation testing PIT</td><td>mspartner acumula 7 integraciones; msprom necesita upgrade Flyway</td></tr>
+        <tr><td><strong>Comunicaciones</strong> (3)</td><td><span class="rating-cell rating-4">3.9</span></td><td>3 / 3</td><td>1 / 3</td><td>83%</td>
+            <td>mssms con Quality Gate PASSED y cobertura 90%</td><td>Migración AWS SDK v1 → v2 en msmail y mssms</td></tr>
+        <tr><td><strong>Integración &amp; Config</strong> (5)</td><td><span class="rating-cell rating-3">3.0</span></td><td>2 / 5</td><td>1 / 5</td><td>70%</td>
+            <td>mspproxy con Quality Gate PASSED</td><td>Eliminar MockService de producción en msv; unificar parent POM de mss</td></tr>
+      </tbody>
+    </table>
+    <div style="margin-top:18px;background:var(--grey-100);padding:12px 14px;border-left:3px solid var(--navy);font-size:12px;color:var(--grey-600);line-height:1.55;">
+      <strong style="color:var(--navy)">Patrón general.</strong> El ecosistema mejora cuanto más pequeño es el servicio: <em>Comunicaciones</em> es el bloque más sano por concentrar funciones acotadas. Los bloques con más integraciones externas y responsabilidades acumuladas (<em>Transaccional</em>) son los que más necesitan inversión.
+    </div>
+  </div>
+  <div class="slide-foot">Análisis por dominio</div>
+  <div class="slide-num">13</div>
+</section>
+
+<!-- SLIDE 14 — DEEP DIVE MST -->
+<section class="slide" id="s14">
+  <div class="slide-content">
+    <div class="eyebrow">12 · Deep dive</div>
+    <h2 class="deck-h2 mt-1">mst — Transaction Microservice</h2>
+    <div class="accent-bar mt-3 mb-5"></div>
+    <div class="grid grid-cols-4 gap-3 mb-4">
+      <div class="kpi-card" style="border-color:var(--coral);"><div class="kpi-num" style="font-size:24px;">808</div><div class="kpi-lbl">Ficheros Java</div></div>
+      <div class="kpi-card" style="border-color:var(--coral);"><div class="kpi-num" style="font-size:24px;">36</div><div class="kpi-lbl">Entidades JPA</div></div>
+      <div class="kpi-card" style="border-color:var(--coral);"><div class="kpi-num" style="font-size:24px;">121</div><div class="kpi-lbl">Scripts Flyway</div></div>
+      <div class="kpi-card" style="border-color:var(--coral);"><div class="kpi-num" style="font-size:24px;">9</div><div class="kpi-lbl">Responsabilidades distintas</div></div>
+    </div>
+    <div class="grid grid-cols-2 gap-5" style="flex:1;">
+      <div>
+        <h3 class="deck-h3 mb-2">Las 9 responsabilidades acumuladas</h3>
+        <div style="font-size:11.5px;display:grid;grid-template-columns:1fr 1fr;gap:6px;">
+          <div style="background:var(--grey-100);padding:8px 10px;border-left:2px solid var(--coral);">① Sesiones de carga eléctrica</div>
+          <div style="background:var(--grey-100);padding:8px 10px;border-left:2px solid var(--coral);">② Repostaje de combustible</div>
+          <div style="background:var(--grey-100);padding:8px 10px;border-left:2px solid var(--coral);">③ Tarjetas bancarias</div>
+          <div style="background:var(--grey-100);padding:8px 10px;border-left:2px solid var(--coral);">④ Checkout B2C</div>
+          <div style="background:var(--grey-100);padding:8px 10px;border-left:2px solid var(--coral);">⑤ RFID</div>
+          <div style="background:var(--grey-100);padding:8px 10px;border-left:2px solid var(--coral);">⑥ Suscripciones</div>
+          <div style="background:var(--grey-100);padding:8px 10px;border-left:2px solid var(--coral);">⑦ Administración back-office</div>
+          <div style="background:var(--grey-100);padding:8px 10px;border-left:2px solid var(--coral);">⑧ WebSocket / tiempo real</div>
+          <div style="background:var(--grey-100);padding:8px 10px;border-left:2px solid var(--coral);grid-column:span 2;">⑨ Conciliación contable SAP</div>
+        </div>
+        <h3 class="deck-h3 mt-4 mb-2">Hotspots de complejidad</h3>
+        <ul style="font-size:11.5px;color:var(--grey-600);line-height:1.7;">
+          <li>· <code style="font-size:10px;">InvoiceUtils.java</code> · 1.792 LOC · complejidad ciclomática 25</li>
+          <li>· <code style="font-size:10px;">TransactionUtils.java</code> · 1.589 LOC · CC 22</li>
+          <li>· <code style="font-size:10px;">ConciliationSapUtils.java</code> · 1.069 LOC</li>
+        </ul>
+      </div>
+      <div>
+        <h3 class="deck-h3 mb-2">Propuesta de descomposición</h3>
+        <div style="font-size:10.5px;line-height:1.35;">
+          <table style="width:100%;border-collapse:collapse;">
+            <thead><tr><th style="background:var(--navy);color:#fff;padding:4px 6px;text-align:left;width:36%;font-size:10.5px;">Bloque a extraer</th><th style="background:var(--navy);color:#fff;padding:4px 6px;text-align:left;font-size:10.5px;">Responsabilidad</th></tr></thead>
+            <tbody>
+              <tr><td style="padding:4px 6px;border-bottom:1px solid var(--grey-200);font-weight:600;color:var(--navy);">Repostaje</td><td style="padding:4px 6px;border-bottom:1px solid var(--grey-200);">RefuelController + RefuelTransactionController + RefuelUtils v1/v2 (~1.500 LOC duplicadas)</td></tr>
+              <tr style="background:var(--grey-100);"><td style="padding:4px 6px;border-bottom:1px solid var(--grey-200);font-weight:600;color:var(--navy);">Admin back-office</td><td style="padding:4px 6px;border-bottom:1px solid var(--grey-200);">Admin/Manager/Incident/Filter controllers — gestión interna, no flujo cliente</td></tr>
+              <tr><td style="padding:4px 6px;border-bottom:1px solid var(--grey-200);font-weight:600;color:var(--navy);">Pagos &amp; Checkout</td><td style="padding:4px 6px;border-bottom:1px solid var(--grey-200);">BankCards/PaymentMethod/Checkout/B2C controllers — métodos de pago + checkout</td></tr>
+              <tr style="background:var(--grey-100);"><td style="padding:4px 6px;border-bottom:1px solid var(--grey-200);font-weight:600;color:var(--navy);">Suscripciones de tx</td><td style="padding:4px 6px;border-bottom:1px solid var(--grey-200);">TransactionSubscriptionsController — duplicado del bounded context mssubscriptions</td></tr>
+              <tr><td style="padding:4px 6px;border-bottom:1px solid var(--grey-200);font-weight:600;color:var(--navy);">WebSocket / tiempo real</td><td style="padding:4px 6px;border-bottom:1px solid var(--grey-200);">WebSocketController STOMP — canal de notificación, no es dominio</td></tr>
+              <tr style="background:var(--grey-100);"><td style="padding:4px 6px;border-bottom:1px solid var(--grey-200);font-weight:600;color:var(--navy);">Conciliación contable</td><td style="padding:4px 6px;border-bottom:1px solid var(--grey-200);">ConciliationSapUtils (1.069 LOC) + ConciliationFillUtils (1.047 LOC) — integración SAFT/STAR/GIC/SAP</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div style="margin-top:8px;background:var(--grey-100);padding:7px 10px;border-left:3px solid var(--coral);font-size:10.5px;color:var(--grey-600);line-height:1.4;">
+          <strong style="color:var(--navy)">Núcleo a conservar en mst:</strong> Sessions, Transactions y RFID — dominio transaccional puro de cara al usuario.
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="slide-foot">Deep dive · mst</div>
+  <div class="slide-num">14</div>
+</section>
+
+<!-- SLIDE 15 — DEEP DIVE MSU -->
+<section class="slide" id="s15">
+  <div class="slide-content">
+    <div class="eyebrow">13 · Deep dive</div>
+    <h2 class="deck-h2 mt-1">msu — User Microservice</h2>
+    <div class="accent-bar mt-3 mb-5"></div>
+    <div class="grid grid-cols-4 gap-3 mb-4">
+      <div class="kpi-card" style="border-color:var(--coral);"><div class="kpi-num" style="font-size:24px;">561</div><div class="kpi-lbl">Ficheros Java</div></div>
+      <div class="kpi-card" style="border-color:var(--coral);"><div class="kpi-num" style="font-size:24px;">144</div><div class="kpi-lbl">Ficheros con javax.*</div></div>
+      <div class="kpi-card" style="border-color:var(--coral);"><div class="kpi-num" style="font-size:24px;">85.6%</div><div class="kpi-lbl">Cobertura reportada</div></div>
+      <div class="kpi-card" style="border-color:var(--coral);"><div class="kpi-num" style="font-size:24px;">~300 h</div><div class="kpi-lbl">Coste estimado migración</div></div>
+    </div>
+    <div class="grid grid-cols-2 gap-5" style="flex:1;">
+      <div>
+        <h3 class="deck-h3 mb-2">Responsabilidades acumuladas</h3>
+        <ul style="font-size:12px;color:var(--grey-600);line-height:1.8;">
+          <li>· Login (SiteMinder + Polaris) + OTP</li>
+          <li>· Registro y T&amp;C / eConsent GDPR</li>
+          <li>· Validación DNI/NIE contra <strong>AEAT vía SOAP/JAX-WS</strong></li>
+          <li>· reCAPTCHA</li>
+          <li>· Gestión de tarjetas asociadas al usuario</li>
+          <li>· Transferencias de crédito entre cuentas</li>
+          <li>· KPIs y reporting</li>
+        </ul>
+        <h3 class="deck-h3 mt-4 mb-2">Particularidades técnicas</h3>
+        <ul style="font-size:11.5px;color:var(--grey-600);line-height:1.7;">
+          <li>· <code style="font-size:10px;">User.java</code> con 496 LOC actuando como god object</li>
+          <li>· 8 librerías <em>feign-client2</em> + integración JAX-WS AEAT sin equivalente nativo en SB3</li>
+          <li>· Inconsistencia Docker (Java 21) vs CI (Java 11)</li>
+          <li>· Sin rama de migración Java iniciada</li>
+        </ul>
+      </div>
+      <div>
+        <h3 class="deck-h3 mb-2">Plan de actuación</h3>
+        <div style="display:flex;flex-direction:column;gap:8px;font-size:11.5px;">
+          <div style="background:var(--grey-100);padding:10px 12px;border-left:3px solid var(--coral);">
+            <div style="font-weight:600;color:var(--navy);">1 · Estabilizar antes de migrar</div>
+            <div style="color:var(--grey-600);margin-top:3px;">Cerrar los 8 FIXMEs activos en producción y normalizar perfiles de log.</div>
+          </div>
+          <div style="background:var(--grey-100);padding:10px 12px;border-left:3px solid var(--coral);">
+            <div style="font-weight:600;color:var(--navy);">2 · Migración Java + Spring Boot 3</div>
+            <div style="color:var(--grey-600);margin-top:3px;">Sustituir <em>javax.*</em> → <em>jakarta.*</em>, subir <em>microservice-parent</em> y migrar JAX-WS AEAT a Apache CXF o equivalente REST.</div>
+          </div>
+          <div style="background:var(--grey-100);padding:10px 12px;border-left:3px solid var(--navy);">
+            <div style="font-weight:600;color:var(--navy);">3 · Desacoplar módulos opcionales</div>
+            <div style="color:var(--grey-600);margin-top:3px;">Aislar la integración AEAT y el módulo de eConsent como microservicios independientes — son piezas con ciclo de vida propio.</div>
+          </div>
+          <div style="background:var(--grey-100);padding:10px 12px;border-left:3px solid var(--navy);">
+            <div style="font-weight:600;color:var(--navy);">4 · Refactor del god object</div>
+            <div style="color:var(--grey-600);margin-top:3px;">Dividir <em>User.java</em> en agregados de dominio claros.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="slide-foot">Deep dive · msu</div>
+  <div class="slide-num">15</div>
+</section>
+
+<!-- SLIDE 16 — TOP HALLAZGOS TRANSVERSALES -->
+<section class="slide" id="s16">
+  <div class="slide-content">
+    <div class="eyebrow">14 · Hallazgos transversales</div>
+    <h2 class="deck-h2 mt-1">Patrones que se repiten en el ecosistema</h2>
+    <div class="accent-bar mt-3 mb-5"></div>
+    <div class="grid grid-cols-2 gap-4" style="font-size:12px;">
+      <div style="background:var(--grey-100);padding:12px 14px;display:flex;gap:12px;">
+        <div style="font-size:28px;font-weight:800;color:var(--coral);min-width:32px;">01</div>
+        <div><strong style="color:var(--navy)">Quality Gate FAILED en 86%</strong> de los servicios. Causas dominantes: exclusiones amplias en Sonar y patrones repetidos de configuración insegura.</div>
+      </div>
+      <div style="background:var(--grey-100);padding:12px 14px;display:flex;gap:12px;">
+        <div style="font-size:28px;font-weight:800;color:var(--coral);min-width:32px;">02</div>
+        <div><strong style="color:var(--navy)">10 servicios en Java 11 / SB 2.x</strong>, con mst y msu sin rama de migración iniciada.</div>
+      </div>
+      <div style="background:var(--grey-100);padding:12px 14px;display:flex;gap:12px;">
+        <div style="font-size:28px;font-weight:800;color:var(--coral);min-width:32px;">03</div>
+        <div><strong style="color:var(--navy)">Trazas y show-sql: true en perfiles no-locales</strong> — los logs de dev, qa y prod incluyen las consultas SQL completas; primero homogeneizar trazas y después retirar <code style="font-size:10px;">show-sql</code>.</div>
+      </div>
+      <div style="background:var(--grey-100);padding:12px 14px;display:flex;gap:12px;">
+        <div style="font-size:28px;font-weight:800;color:var(--coral);min-width:32px;">04</div>
+        <div><strong style="color:var(--navy)">Dockerfile Java 21 + CI Java 11</strong> en 5 servicios (msu, mspproxy, mss, msprom, msvouchers); el artefacto se compila a 11 pero corre en JVM 21.</div>
+      </div>
+      <div style="background:var(--grey-100);padding:12px 14px;display:flex;gap:12px;">
+        <div style="font-size:28px;font-weight:800;color:var(--coral);min-width:32px;">05</div>
+        <div><strong style="color:var(--navy)">OpenAPI mixto</strong>: controllers v1 hardcoded conviven con v2/v3 generados (mscp, mst, msb, msu) — dificulta automatizar el contrato de API.</div>
+      </div>
+      <div style="background:var(--grey-100);padding:12px 14px;display:flex;gap:12px;">
+        <div style="font-size:28px;font-weight:800;color:var(--coral);min-width:32px;">06</div>
+        <div><strong style="color:var(--navy)">AWS SDK v1</strong> aún presente en <em>msmail</em>, <em>mssms</em> y <em>mscrypt</em> (EOL desde diciembre 2024).</div>
+      </div>
+      <div style="background:var(--grey-100);padding:12px 14px;display:flex;gap:12px;">
+        <div style="font-size:28px;font-weight:800;color:var(--coral);min-width:32px;">07</div>
+        <div><strong style="color:var(--navy)">Parent POM con versiones dispares</strong> (de 1.0.6 a 2.0.2) y 4 servicios con parent custom — falta una versión "bendecida" del ecosistema.</div>
+      </div>
+      <div style="background:var(--grey-100);padding:12px 14px;display:flex;gap:12px;">
+        <div style="font-size:28px;font-weight:800;color:var(--coral);min-width:32px;">08</div>
+        <div><strong style="color:var(--navy)">Clases utility de gran tamaño y complejidad</strong>: <code style="font-size:10px;">InvoiceUtils</code> (1.792 LOC, CC 25) y <code style="font-size:10px;">TransactionUtils</code> (1.589 LOC) en <em>mst</em> son los hotspots del ecosistema.</div>
+      </div>
+      <div style="background:var(--grey-100);padding:12px 14px;display:flex;gap:12px;">
+        <div style="font-size:28px;font-weight:800;color:var(--coral);min-width:32px;">09</div>
+        <div><strong style="color:var(--navy)">FIXME/TODO activos en producción</strong> sin ticket asociado en 9 servicios; destaca el TODO de la conciliación SAP de <em>mst</em>.</div>
+      </div>
+    </div>
+  </div>
+  <div class="slide-foot">Hallazgos transversales</div>
+  <div class="slide-num">16</div>
+</section>
+
+<!-- SLIDE 17 — HOJA DE RUTA -->
+<section class="slide" id="s17">
+  <div class="slide-content">
+    <div class="eyebrow">15 · Hoja de ruta</div>
+    <h2 class="deck-h2 mt-1">Plan en cinco fases</h2>
+    <div class="accent-bar mt-2 mb-3"></div>
+    <div style="flex:1;display:flex;flex-direction:column;gap:7px;">
+      <!-- Fase 1 — Traspaso (completada) -->
+      <div style="display:flex;gap:18px;align-items:stretch;opacity:.85;">
+        <div style="background:#5F6C76;color:#fff;padding:9px 14px;min-width:188px;display:flex;flex-direction:column;justify-content:center;position:relative;">
+          <div style="font-size:11px;opacity:.7;letter-spacing:.1em;">FASE 1</div>
+          <div style="font-size:19px;font-weight:800;line-height:1.1;margin-top:3px;">Traspaso</div>
+          <div style="font-size:11px;opacity:.7;margin-top:6px;">Mar–Abr 2026</div>
+          <div style="position:absolute;top:10px;right:12px;font-size:9px;font-weight:700;letter-spacing:.08em;background:#2E7D4F;color:#fff;padding:2px 6px;border-radius:3px;">✓ COMPLETADA</div>
+        </div>
+        <div style="flex:1;background:var(--grey-100);padding:8px 14px;font-size:11px;color:var(--grey-600);display:flex;flex-direction:column;gap:3px;">
+          <div><strong style="color:var(--navy)">Auditoría técnica de los 28 microservicios</strong> + recopilación de métricas SonarCloud y entrega del informe consolidado.</div>
+          <div><strong style="color:var(--navy)">Handover formal del equipo anterior a Plexus Tech</strong>, incluido el traspaso del área de mantenimiento (&gt;200 incidencias heredadas). Cierre el 30-abr-2026.</div>
+        </div>
+      </div>
+      <!-- Fase 2 — Control -->
+      <div style="display:flex;gap:18px;align-items:stretch;">
+        <div style="background:var(--navy);color:#fff;padding:9px 14px;min-width:188px;display:flex;flex-direction:column;justify-content:center;">
+          <div style="font-size:11px;opacity:.7;letter-spacing:.1em;">FASE 2</div>
+          <div style="font-size:19px;font-weight:800;line-height:1.1;margin-top:3px;">Control</div>
+          <div style="font-size:11px;opacity:.7;margin-top:6px;">Mes 1–2 · May–Jun 2026</div>
+        </div>
+        <div style="flex:1;background:var(--grey-100);padding:8px 14px;font-size:11px;color:var(--grey-600);display:flex;flex-direction:column;gap:3px;">
+          <div><strong style="color:var(--navy)">Cierre de evolutivos abiertos en paralelo.</strong> Terminar los desarrollos que actualmente avanzan fuera del equipo Plexus y consolidarlos al tronco principal.</div>
+          <div><strong style="color:var(--navy)">Mantenimiento bajo control.</strong> Triaje y cierre del backlog heredado (&gt;200 incidencias antiguas): priorizar, resolver lo crítico y descartar lo obsoleto para arrancar Fase 3 con cola sana.</div>
+          <div><strong style="color:var(--navy)">Toma de control único.</strong> Plexus pasa a ser el punto único de entrada para cualquier nuevo cambio en los 28 servicios.</div>
+        </div>
+      </div>
+      <!-- Fase 3 — Estabilización -->
+      <div style="display:flex;gap:18px;align-items:stretch;">
+        <div style="background:var(--navy-soft);color:#fff;padding:9px 14px;min-width:188px;display:flex;flex-direction:column;justify-content:center;">
+          <div style="font-size:11px;opacity:.7;letter-spacing:.1em;">FASE 3</div>
+          <div style="font-size:19px;font-weight:800;line-height:1.1;margin-top:3px;">Estabilización</div>
+          <div style="font-size:11px;opacity:.7;margin-top:6px;">Mes 3–5 · Jul–Sep 2026</div>
+        </div>
+        <div style="flex:1;background:var(--grey-100);padding:8px 14px;font-size:11px;color:var(--grey-600);display:flex;flex-direction:column;gap:3px;">
+          <div><strong style="color:var(--navy)">Inventario consolidado.</strong> Estado real de ramas abiertas, dependencias críticas, secretos y entornos productivos.</div>
+          <div><strong style="color:var(--navy)">Quick wins de configuración.</strong> Mejora de trazas + retirada de <code style="font-size:10px;">show-sql</code> en perfiles no-locales, alineación Docker/CI a Java 21 y limpieza de artefactos SNAPSHOT en producción.</div>
+          <div><strong style="color:var(--navy)">Cobertura real medida en CI.</strong> Establecer medición fiable de cobertura para los 28 servicios; objetivo Quality Gate verde en ≥60%.</div>
+          <div><strong style="color:var(--navy)">Alineación Docker ↔ CI.</strong> Resolver la inconsistencia Java 11/21 en los 5 servicios afectados.</div>
+        </div>
+      </div>
+      <!-- Fase 4 — Actualización -->
+      <div style="display:flex;gap:18px;align-items:stretch;">
+        <div style="background:var(--coral);color:#fff;padding:9px 14px;min-width:188px;display:flex;flex-direction:column;justify-content:center;">
+          <div style="font-size:11px;opacity:.85;letter-spacing:.1em;">FASE 4</div>
+          <div style="font-size:19px;font-weight:800;line-height:1.1;margin-top:3px;">Actualización</div>
+          <div style="font-size:11px;opacity:.85;margin-top:6px;">Mes 6–8 · Oct–Dic 2026</div>
+        </div>
+        <div style="flex:1;background:var(--grey-100);padding:8px 14px;font-size:11px;color:var(--grey-600);display:flex;flex-direction:column;gap:3px;">
+          <div><strong style="color:var(--navy)">Migración Java 21 + SB 3.x</strong> de 8 servicios. Foco crítico inmediato: msfc, msb, mspproxy.</div>
+          <div><strong style="color:var(--navy)">Sustitución javax.* → jakarta.*</strong>, upgrade de Hibernate, MariaDB JDBC y Apache CXF para integraciones SOAP.</div>
+        </div>
+      </div>
+      <!-- Fase 5 — Consolidación -->
+      <div style="display:flex;gap:18px;align-items:stretch;">
+        <div style="background:#1f3a48;color:#fff;padding:9px 14px;min-width:188px;display:flex;flex-direction:column;justify-content:center;">
+          <div style="font-size:11px;opacity:.7;letter-spacing:.1em;">FASE 5</div>
+          <div style="font-size:19px;font-weight:800;line-height:1.1;margin-top:3px;">Consolidación</div>
+          <div style="font-size:11px;opacity:.7;margin-top:6px;">2027<br/>(freeze por servicio)</div>
+        </div>
+        <div style="flex:1;background:var(--grey-100);padding:8px 14px;font-size:11px;color:var(--grey-600);display:flex;flex-direction:column;gap:3px;">
+          <div><strong style="color:var(--navy)">Freeze parcial por servicio.</strong> Cada microservicio que entra en migración queda ~2 meses sin nuevos evolutivos (no es un freeze total del ecosistema): el resto sigue avanzando en paralelo. Una migración de este alcance no es viable mientras llegan cambios funcionales al mismo servicio.</div>
+          <div><strong style="color:var(--navy)">Migración Java 21 + SB 3.x de msu</strong> (~300 h): el segundo servicio más grande del ecosistema, sin rama abierta y con integraciones críticas (AEAT SOAP → Apache CXF, JAX-WS → jakarta).</div>
+          <div><strong style="color:var(--navy)">Extracción de responsabilidades de mst</strong> hacia msrefueling, mssubscriptions, msa y un nuevo realtime-gateway. Aislamiento de la conciliación contable (SAFT/STAR/GIC/SAP) en un servicio event-driven dedicado. Por volumen y acoplamiento acumulado, abordar la migración de mst como un único esfuerzo no resulta viable; el plan es reducir antes su superficie funcional y, una vez consolidada la descomposición, evaluar la migración del núcleo resultante en una fase posterior.</div>
+          <div><strong style="color:var(--navy)">Reapertura de evolutivos</strong> sobre una base limpia, con métricas reales y velocidad sostenible.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="slide-foot">Hoja de ruta · 5 fases</div>
+  <div class="slide-num">17</div>
+</section>
+
+<!-- SLIDE 18 — QUICK WINS -->
+<section class="slide-archived" id="s18">
+  <div class="slide-content">
+    <div class="eyebrow">16 · Quick wins</div>
+    <h2 class="deck-h2 mt-1">Acciones de menos de dos semanas</h2>
+    <div class="accent-bar mt-3 mb-5"></div>
+    <table class="data-tbl" style="font-size:12px;">
+      <thead><tr>
+        <th>#</th><th>Acción</th><th>Servicios</th><th>Prio.</th><th>Esfuerzo</th><th>Impacto</th>
+      </tr></thead>
+      <tbody>
+        <tr><td>1</td><td>Alinear Dockerfile y CI a Java 21 en los 5 inconsistentes</td><td>5</td><td><span class="pill priority-high">Alta</span></td><td>Bajo</td><td>Elimina la falsa sensación de migración completada</td></tr>
+        <tr><td>2</td><td>Eliminar <code>FlywayConfig.cleanMigrate</code> en mscm</td><td>1</td><td><span class="pill priority-high">Alta</span></td><td>Bajo</td><td>Evita riesgo de wipe accidental de BD</td></tr>
+        <tr><td>3</td><td>Eliminar <code>MockService</code> del binario de producción en msv</td><td>1</td><td><span class="pill priority-high">Alta</span></td><td>Bajo</td><td>Quita superficie de testing en prod</td></tr>
+        <tr><td>4</td><td>Mergear rama de migración Java casi lista en msfc (49↑/1↓)</td><td>1</td><td><span class="pill priority-high">Alta</span></td><td>Alto</td><td>Saca al servicio más obsoleto del rojo</td></tr>
+        <tr><td>5</td><td>Eliminar artefactos SNAPSHOT en producción (msb, msfc)</td><td>2</td><td><span class="pill priority-high">Alta</span></td><td>Bajo</td><td>Versiones reproducibles en prod</td></tr>
+        <tr><td>6</td><td>Unificar parent POM al <em>microservice3-parent:2.0.2</em></td><td>~20</td><td><span class="pill priority-med">Media</span></td><td>Medio</td><td>Versión "bendecida" única del ecosistema</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="slide-foot">Quick wins</div>
+  <div class="slide-num">18</div>
+</section>
+
+<!-- SLIDE 19 — PRE-REQUISITOS Y RIESGOS -->
+<section class="slide-archived" id="s19">
+  <div class="slide-content">
+    <div class="eyebrow">17 · Pre-requisitos · Riesgos</div>
+    <h2 class="deck-h2 mt-1">Qué necesitamos y qué pasa si no actuamos</h2>
+    <div class="accent-bar mt-3 mb-5"></div>
+    <div class="grid grid-cols-2 gap-6" style="flex:1;">
+      <div>
+        <h3 class="deck-h3 mb-3">Pre-requisitos para ejecutar el plan</h3>
+        <div style="display:flex;flex-direction:column;gap:8px;font-size:12.5px;">
+          <div style="background:var(--grey-100);padding:10px 12px;border-left:3px solid var(--navy);">
+            <strong style="color:var(--navy)">Cierre de evolutivos paralelos en curso</strong><br/>
+            <span style="color:var(--grey-600);">Lista de ramas/features que avanzan actualmente fuera del equipo, con fecha objetivo de cierre antes del 30 de junio.</span>
+          </div>
+          <div style="background:var(--grey-100);padding:10px 12px;border-left:3px solid var(--navy);">
+            <strong style="color:var(--navy)">Acceso unificado a SonarCloud y CI</strong><br/>
+            <span style="color:var(--grey-600);">Para configurar el Quality Gate común y JaCoCo desde el <em>microservice-parent</em>.</span>
+          </div>
+          <div style="background:var(--grey-100);padding:10px 12px;border-left:3px solid var(--navy);">
+            <strong style="color:var(--navy)">Ventana de freeze por servicio acordada</strong><br/>
+            <span style="color:var(--grey-600);">~2 meses por servicio en migración (Fase 5, 2027). No es un freeze total: el resto del ecosistema sigue evolucionando en paralelo.</span>
+          </div>
+          <div style="background:var(--grey-100);padding:10px 12px;border-left:3px solid var(--navy);">
+            <strong style="color:var(--navy)">Interlocución con AEAT y SAP</strong><br/>
+            <span style="color:var(--grey-600);">Para la migración SOAP/JAX-WS de msu y el desbloqueo de la conciliación de mst (TODO en producción).</span>
+          </div>
+          <div style="background:var(--grey-100);padding:10px 12px;border-left:3px solid var(--navy);">
+            <strong style="color:var(--navy)">Coordinación con propietarios de librerías comunes</strong><br/>
+            <span style="color:var(--grey-600);"><em>feign-clientN</em>, <em>microservice-parent</em>, <em>parent-pom</em>.</span>
+          </div>
+        </div>
+      </div>
+      <div>
+        <h3 class="deck-h3 mb-3">Riesgos si no se actúa</h3>
+        <div style="display:flex;flex-direction:column;gap:8px;font-size:12.5px;">
+          <div style="background:#FBF1DE;padding:10px 12px;border-left:3px solid var(--amber);">
+            <strong style="color:var(--navy)">EOL de Java 11.</strong> Soporte LTS extendido hasta 2032 pero cada vez con menos parches; el ecosistema empieza a romperse con dependencias nuevas.
+          </div>
+          <div style="background:#F9E5E4;padding:10px 12px;border-left:3px solid var(--red);">
+            <strong style="color:var(--navy)">SDK AWS v1 sin soporte.</strong> EOL desde diciembre 2024 — incidentes de seguridad no se parchean.
+          </div>
+          <div style="background:#FBF1DE;padding:10px 12px;border-left:3px solid var(--amber);">
+            <strong style="color:var(--navy)">Mantenibilidad de mst.</strong> Cada nuevo evolutivo en transaction es más caro que el anterior; el riesgo de regresión sube con cada release.
+          </div>
+          <div style="background:#FBF1DE;padding:10px 12px;border-left:3px solid var(--amber);">
+            <strong style="color:var(--navy)">Onboarding lento.</strong> READMEs mínimos y documentación dispersa elevan el coste de entrada de nuevos perfiles.
+          </div>
+          <div style="background:#F9E5E4;padding:10px 12px;border-left:3px solid var(--red);">
+            <strong style="color:var(--navy)">Cobertura no contrastada.</strong> Incorporar JaCoCo permitirá detectar regresiones graves antes de que lleguen a producción.
+          </div>
+          <div style="background:#FBF1DE;padding:10px 12px;border-left:3px solid var(--amber);">
+            <strong style="color:var(--navy)">Bloqueo del crecimiento.</strong> Sin descomposición de mst, el equipo seguirá teniendo un único punto de contención para todos los flujos transaccionales.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="slide-foot">Pre-requisitos &amp; riesgos</div>
+  <div class="slide-num">19</div>
+</section>
+
+<!-- SLIDE 20 — PRÓXIMOS PASOS -->
+<section class="slide-archived" id="s20">
+  <div class="slide-content">
+    <div class="eyebrow">18 · Próximos pasos</div>
+    <h2 class="deck-h2 mt-1">Cómo empezamos</h2>
+    <div class="accent-bar mt-3 mb-5"></div>
+    <div class="grid grid-cols-3 gap-5" style="flex:1;">
+      <div style="background:var(--grey-100);padding:18px;border-top:4px solid var(--navy);">
+        <div style="font-size:11px;color:var(--navy);font-weight:700;letter-spacing:.1em;">SEMANA 1 · MAY 2026</div>
+        <h3 class="deck-h3 mt-1">Alineamiento</h3>
+        <ul style="font-size:12px;color:var(--grey-600);line-height:1.7;margin-top:8px;">
+          <li>· Validación de la priorización con MOEVE</li>
+          <li>· Inventario detallado de evolutivos paralelos a cerrar antes de jun 2026</li>
+          <li>· Confirmación de la ventana de freeze por servicio (Fase 5 · 2027)</li>
+        </ul>
+      </div>
+      <div style="background:var(--grey-100);padding:18px;border-top:4px solid var(--coral);">
+        <div style="font-size:11px;color:var(--coral);font-weight:700;letter-spacing:.1em;">SEMANAS 2–4 · MAY–JUN 2026</div>
+        <h3 class="deck-h3 mt-1">Quick wins</h3>
+        <ul style="font-size:12px;color:var(--grey-600);line-height:1.7;margin-top:8px;">
+          <li>· Normalización de perfiles de log y alineación Docker/CI</li>
+          <li>· Habilitar JaCoCo en el microservice-parent</li>
+          <li>· Merge de rama de migración de msfc</li>
+        </ul>
+      </div>
+      <div style="background:var(--grey-100);padding:18px;border-top:4px solid var(--navy-soft);">
+        <div style="font-size:11px;color:var(--navy-soft);font-weight:700;letter-spacing:.1em;">JUN 2026 EN ADELANTE</div>
+        <h3 class="deck-h3 mt-1">Plan completo</h3>
+        <ul style="font-size:12px;color:var(--grey-600);line-height:1.7;margin-top:8px;">
+          <li>· Cierre de Fase 2 (Control) en jun 2026</li>
+          <li>· Arranque formal de Fase 3 (Estabilización) en jul 2026</li>
+          <li>· Plan detallado de migración mst / msu con MOEVE; OKRs y KPIs de seguimiento</li>
+        </ul>
+      </div>
+    </div>
+    <div class="mt-6 grid grid-cols-2 gap-6" style="font-size:13px;">
+      <div style="background:var(--navy);color:#fff;padding:18px;">
+        <div style="font-size:11px;opacity:.7;letter-spacing:.1em;">CRITERIO DE ÉXITO · MAY 2026 — ABR 2027</div>
+        <ul style="margin-top:10px;line-height:1.6;">
+          <li>· 100% de servicios en Java 21 + Spring Boot 3</li>
+          <li>· Quality Gate verde en ≥ 80% del ecosistema</li>
+          <li>· Cobertura real medida con JaCoCo &gt; 70%</li>
+          <li>· Reducción del 40% del tamaño de mst</li>
+        </ul>
+      </div>
+      <div style="background:var(--coral);color:#fff;padding:18px;">
+        <div style="font-size:11px;opacity:.85;letter-spacing:.1em;">RESULTADO ESPERADO</div>
+        <p style="margin-top:10px;line-height:1.6;">Un ecosistema más sano, predecible y rápido de evolucionar, con un control único desde Plexus y métricas reales para la toma de decisiones.</p>
+      </div>
+    </div>
+  </div>
+  <div class="slide-foot">Próximos pasos</div>
+  <div class="slide-num">20</div>
+</section>
+
+<!-- SLIDE 21 — CONTRAPORTADA -->
+<section class="slide" id="s21">
+  <div class="slide-content" style="justify-content:center;align-items:center;text-align:center;">
+    <img src="assets/plexus-logo.png" style="height:48px;margin-bottom:32px;"/>
+    <div class="eyebrow">Gracias</div>
+    <h1 class="deck-title mt-4" style="font-size:46px;">¿Conversamos?</h1>
+    <div class="accent-bar mt-4 mb-6" style="margin-left:auto;margin-right:auto;"></div>
+    <p style="font-size:14px;color:var(--grey-600);max-width:560px;">Estamos a vuestra disposición para profundizar en cualquiera de los servicios, en la matriz P×E detallada del anexo o en el detalle de las fases de la hoja de ruta.</p>
+    <div style="margin-top:48px;font-size:12px;color:var(--grey-600);">Plexus Tech · Equipo de Auditoría · Mayo 2026</div>
+  </div>
+</section>
+
+<!-- SLIDE 22 — ANEXO MATRIZ DETALLADA (header) -->
+<section class="slide" id="s22">
+  <div class="slide-content" style="justify-content:center;">
+    <div class="eyebrow">Anexo</div>
+    <h1 class="deck-title mt-4">Matriz P × E detallada</h1>
+    <div class="accent-bar mt-4 mb-6"></div>
+    <p style="font-size:15px;color:var(--grey-600);max-width:780px;line-height:1.6;">
+      Listado completo de hallazgos individuales por microservicio, con rating en escala 1–5,
+      prioridad de actuación y esfuerzo estimado. Pensado como apoyo de detalle, no como material de presentación.
+    </p>
+    <div style="margin-top:32px;display:flex;gap:24px;">
+      <div class="kpi-card"><div class="kpi-num">120+</div><div class="kpi-lbl">Hallazgos individuales</div></div>
+      <div class="kpi-card"><div class="kpi-num">28</div><div class="kpi-lbl">Servicios cubiertos</div></div>
+      <div class="kpi-card"><div class="kpi-num">7</div><div class="kpi-lbl">Dimensiones por servicio</div></div>
+    </div>
+  </div>
+  <div class="slide-foot">Anexo · Matriz P×E</div>
+  <div class="slide-num">A1</div>
+</section>
+
+<!-- SLIDE 23 — ANEXO TABLA P×E DETALLADA -->
+<section class="slide anexo-slide" id="s23">
+  <div class="slide-content">
+    <div class="eyebrow">Anexo · Matriz P × E</div>
+    <h2 class="deck-h2 mt-1">Tabla de hallazgos por microservicio</h2>
+    <div class="accent-bar mt-3 mb-4"></div>
+    <p style="font-size:12px;color:var(--grey-600);margin-bottom:10px;">Una fila por hallazgo. <code style="font-size:11px;">Rating</code> en escala 1–5 (1 crítico → 5 excelente). Prioridad y Esfuerzo en <strong>A</strong>lta / <strong>M</strong>edia / <strong>B</strong>aja.</p>
+    <div style="flex:1;overflow-y:auto;border:1px solid var(--grey-200);border-radius:4px;">
+      <table class="data-tbl" id="pxe-table" style="font-size:11px;width:100%;">
+        <thead style="position:sticky;top:0;z-index:5;"><tr>
+          <th>Servicio</th><th>Dimensión</th><th>Hallazgo</th><th style="text-align:center;">R</th><th style="text-align:center;">P</th><th style="text-align:center;">E</th>
+        </tr></thead>
+        <tbody id="pxe-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+  <div class="slide-foot">Anexo · Matriz P × E detallada</div>
+  <div class="slide-num">A2</div>
+</section>
+
+</div>
+</div><!-- /stage -->
+
+<script>
+/* =========================================================
+   CHART DATA
+========================================================= */
+const NAVY='#0E3F5C', NAVY2='#1F5878', CORAL='#D26F73', CORAL2='#E89DA0', GREEN='#3FA776', AMBER='#E0A030', GREY='#A8B2BB';
+
+const colors10 = [NAVY,CORAL,NAVY2,CORAL2,GREEN,AMBER,GREY,'#7B6BA1','#4BACC6','#8064A2'];
+
+/* Chart configs — instantiated lazily when their slide becomes active */
+const covData = [
+  ['msn',96.1],['mssubscriptions',92.3],['msau',91.1],['mssms',90.3],
+  ['mspartner',88.8],['msvouchers',87.2],['msu',85.6],['msrfid',83.0],
+  ['msa',80.0],['msstation',75.6],['msset',75.8],['mspproxy',72.5],
+  ['mss',64.7],['msp',63.3]
+].sort((a,b)=>b[1]-a[1]);
+
+const chartConfigs = {
+  chartJava: {
+    type:'doughnut',
+    data:{
+      labels:['Java 21 · SB 3','Java 11 · SB 2','Stack atípico'],
+      datasets:[{data:[18,8,2],backgroundColor:[NAVY,CORAL,AMBER],borderWidth:0}]
+    },
+    options:{
+      responsive:true,
+      maintainAspectRatio:false,
+      cutout:'62%',
+      layout:{padding:6},
+      plugins:{legend:{position:'bottom',labels:{font:{size:11},padding:12,boxWidth:12}}}
+    }
+  },
+  chartCoverage: {
+    type:'bar',
+    data:{
+      labels:covData.map(d=>d[0]),
+      datasets:[{
+        data:covData.map(d=>d[1]),
+        backgroundColor:covData.map(d=>d[1]>=80?GREEN:d[1]>=60?AMBER:CORAL),
+        borderWidth:0
+      }]
+    },
+    options:{
+      responsive:true,
+      maintainAspectRatio:false,
+      indexAxis:'y',
+      layout:{padding:{left:4,right:8}},
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.parsed.x+'%'}}},
+      scales:{
+        x:{max:100,ticks:{callback:v=>v+'%',font:{size:10}}},
+        y:{ticks:{font:{size:10}}}
+      }
+    }
+  },
+  chartRadar: {
+    type:'radar',
+    data:{
+      labels:['Seguridad','Modernización','Tests & QA','Arquitectura','Observabilidad','Documentación'],
+      datasets:[
+        {label:'Comunicaciones',data:[3.8,4.5,4.2,3.9,3.5,3.4],borderColor:GREEN,backgroundColor:'rgba(63,167,118,.15)',borderWidth:2},
+        {label:'Tarjetas',data:[3.2,4.1,3.6,3.5,3.0,3.0],borderColor:NAVY2,backgroundColor:'rgba(31,88,120,.15)',borderWidth:2},
+        {label:'Transaccional & Pagos',data:[2.2,2.0,2.5,2.4,2.6,2.5],borderColor:CORAL,backgroundColor:'rgba(210,111,115,.15)',borderWidth:2},
+        {label:'Identidad & Seguridad',data:[2.5,3.5,3.0,2.9,2.8,2.6],borderColor:NAVY,backgroundColor:'rgba(14,63,92,.12)',borderWidth:2}
+      ]
+    },
+    options:{
+      responsive:true,
+      maintainAspectRatio:false,
+      layout:{padding:8},
+      plugins:{legend:{position:'bottom',labels:{font:{size:10},boxWidth:10,padding:10}}},
+      scales:{r:{min:0,max:5,ticks:{stepSize:1,font:{size:9}},pointLabels:{font:{size:10}}}}
+    }
+  }
+};
+
+/* Matrix scatter — prioridad x esfuerzo. X=esfuerzo (1-3), Y=prioridad (1-3, 3 alta arriba) */
+const matrixPoints = [
+  // [esfuerzo, prioridad, r, group, label]
+  [1,3,16,NAVY,'Defaults bootstrap.yml'],
+  [1,3,14,CORAL,'Swagger público'],
+  [2,3,10,NAVY2,'Mejorar trazas + show-sql'],
+  [1,3,8,GREEN,'Dockerfile/CI Java mismatch'],
+  [2,3,10,NAVY,'JaCoCo en parent'],
+  [2,3,9,CORAL,'AWS SDK v1 → v2'],
+  [3,3,16,CORAL,'Migración mst Java 21'],
+  [3,3,14,CORAL,'Migración msu Java 21'],
+  [2,3,10,CORAL,'Migración msfc'],
+  [3,3,12,NAVY2,'Migración msb'],
+  [2,3,8,GREEN,'Migración mssubscriptions Java done'],
+  [2,2,9,NAVY,'OpenAPI mixto'],
+  [3,2,14,CORAL,'Descomposición mst'],
+  [3,2,12,NAVY,'Refactor User god object'],
+  [2,2,7,CORAL2,'Cipher key mscm'],
+  [1,2,6,CORAL2,'FIXMEs msrefueling'],
+  [2,2,8,NAVY2,'OpenSearch mscp tuning'],
+  [1,2,6,GREY,'MockService prod msv'],
+  [2,2,8,NAVY2,'API v1/v2/v3 mscp'],
+  [3,1,9,GREY,'Sub-redominio mss parent'],
+  [2,1,7,GREY,'Geocoding caché msstation'],
+  [1,1,5,NAVY2,'Rama abandonada msl'],
+  [1,1,5,CORAL,'Eliminar SNAPSHOT msb'],
+  [3,1,8,GREEN,'PIT mutation testing extendido'],
+  [2,1,6,AMBER,'Migración Pinpoint SDK v2'],
+  [1,1,5,AMBER,'DEBUG logs mssms']
+];
+
+chartConfigs.chartMatrix = {
+  type:'bubble',
+  data:{
+    datasets: matrixPoints.map(p=>({
+      label:p[4],
+      data:[{x:p[0],y:p[1],r:p[2]}],
+      backgroundColor:p[3]+'cc',
+      borderColor:p[3],
+      borderWidth:1
+    }))
+  },
+  options:{
+    responsive:true,
+    maintainAspectRatio:false,
+    layout:{padding:8},
+    plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.dataset.label}}},
+    scales:{
+      x:{min:0.5,max:3.5,ticks:{stepSize:1,callback:v=>['','Bajo','Medio','Alto'][v]||'',font:{size:11}},title:{display:true,text:'Esfuerzo',font:{size:11,weight:'600'}}},
+      y:{min:0.5,max:3.5,ticks:{stepSize:1,callback:v=>['','Baja','Media','Alta'][v]||'',font:{size:11}},title:{display:true,text:'Prioridad',font:{size:11,weight:'600'}}}
+    }
+  }
+};
+
+/* Lazy chart initialiser — Chart.js measures container with getBoundingClientRect
+   which returns transform-scaled coords. We temporarily strip the deck's
+   transform during creation so Chart.js sees the true CSS pixel dimensions. */
+function ensureCharts(slide){
+  if(!slide) return;
+  const pending = [];
+  slide.querySelectorAll('canvas[id]').forEach(cv=>{
+    if(!cv.dataset.inited && chartConfigs[cv.id]) pending.push(cv);
+  });
+  if(!pending.length) return;
+  const savedTransform = deck.style.transform;
+  deck.style.transform = 'none';
+  void deck.offsetWidth; // force layout flush
+  pending.forEach(cv=>{
+    cv.dataset.inited='1';
+    new Chart(cv, chartConfigs[cv.id]);
+  });
+  deck.style.transform = savedTransform;
+}
+
+/* =========================================================
+   ANEXO · MATRIZ P×E DETALLADA
+   Cada fila: servicio, dimensión, hallazgo, rating(1-5), prio(A/M/B), esf(A/M/B)
+========================================================= */
+const findings = [
+  // mst — Transaction
+  ['mst','Modernización','Java 11 + Spring Boot 2.x sin rama de migración iniciada',1,'A','A'],
+  ['mst','Arquitectura','9 responsabilidades acumuladas en un único servicio',1,'A','A'],
+  ['mst','Calidad','InvoiceUtils.java 1.792 LOC con CC 25',1,'A','M'],
+  ['mst','Calidad','TransactionUtils.java 1.589 LOC con CC 22',1,'A','M'],
+  ['mst','Integración','TODO activo "SAP DTO temporarily disabled" en ConciliationUtils.java',2,'A','M'],
+  ['mst','Arquitectura','9 controllers con OpenAPI hardcoded + 9 generados',2,'M','M'],
+  ['mst','Modernización','109 ficheros javax.* + 6 dependencias feign-client2',2,'A','A'],
+
+  // msu — User
+  ['msu','Modernización','Java 11 + Spring Boot 2.x sin rama de migración iniciada',1,'A','A'],
+  ['msu','Arquitectura','User.java actuando como god object (496 LOC)',2,'M','M'],
+  ['msu','Integración','Integración SOAP/JAX-WS con AEAT sin equivalente nativo en SB3',2,'A','A'],
+  ['msu','Modernización','Inconsistencia Dockerfile Java 21 + CI Java 11',2,'A','B'],
+  ['msu','Calidad','8 FIXMEs activos en producción (3 críticos)',2,'M','M'],
+  ['msu','Modernización','144 ficheros javax.* + 8 librerías feign-client2',2,'A','A'],
+
+  // msfc — Fraud Control
+  ['msfc','Modernización','Spring Boot 2.1.5.RELEASE — la más antigua del ecosistema',1,'A','M'],
+  ['msfc','Modernización','Artefacto 0.0.1-SNAPSHOT en producción',2,'A','B'],
+  ['msfc','Modernización','Spring Cloud Greenwich.SR1 + EclipseLink 2.7.9',2,'A','M'],
+  ['msfc','Calidad','Rama de migración casi lista (49 commits ahead, 1 behind)',3,'A','B'],
+
+  // msb — Broker
+  ['msb','Modernización','Java 11 + Spring Boot 2.x, rama migración 50 commits desfasada',2,'A','A'],
+  ['msb','Arquitectura','OCPI + Hubject + RFID + CPO platform en un único servicio',2,'M','A'],
+  ['msb','Calidad','HubjectSendRequestUtils con CC 25',2,'M','M'],
+  ['msb','Modernización','Artefacto chargepoint-feign-client2:1.2.4-SNAPSHOT en prod',2,'A','B'],
+  ['msb','Calidad','RestTemplate y Feign coexisten en paralelo',3,'M','M'],
+  ['msb','Calidad','24 vulnerabilidades (C) y 17 bugs (E) en SonarCloud',2,'A','M'],
+
+  // msa — Admin
+  ['msa','Documentación','README de 1 línea',3,'M','B'],
+  ['msa','Calidad','OpenAPI mixto en 3 controllers',3,'M','M'],
+  ['msa','Calidad','Método logIn() con CC 12',3,'M','B'],
+  ['msa','Arquitectura','Concentración de admins + KPIs + RFID + CDR + recovery',3,'M','M'],
+
+  // msau — Auth
+  ['msau','Seguridad','Revisar cifrado del header x-pass (actualmente Base64)',2,'M','M'],
+  ['msau','Calidad','AuthController sin tests directos',2,'A','M'],
+  ['msau','Operación','show-sql: true en perfil no-local',3,'M','B'],
+
+  // mscrypt — Crypt
+  ['mscrypt','Modernización','AWS SDK v1 en configuración (EOL diciembre 2024)',2,'A','M'],
+  ['mscrypt','Calidad','Cobertura de tests del 30,9% en servicio crítico',2,'A','M'],
+  ['mscrypt','Seguridad','Custodia de claves con baja cobertura — auditoría específica recomendada',2,'A','M'],
+
+  // mscm — Card Management
+  ['mscm','Seguridad','Z-Code cipher key con patrón hexadecimal secuencial predecible',2,'M','M'],
+  ['mscm','Operación','FlywayConfig.cleanMigrate presente en código',1,'A','B'],
+  ['mscm','Operación','show-sql: true en perfil no-local',3,'M','B'],
+  ['mscm','Calidad','Exclusión amplia de Sonar — cobertura no contrastable',3,'M','B'],
+
+  // mscp — Charge Point
+  ['mscp','Arquitectura','API triplicada v1 / v2 / v3 coexistiendo',2,'M','A'],
+  ['mscp','Operación','Feign logger en nivel FULL en producción',2,'A','B'],
+  ['mscp','Calidad','EvseUtils con CC 10 y TODOs sin cerrar',3,'M','M'],
+  ['mscp','Arquitectura','12 controllers + 29 entidades + 13 Feign clients — candidato a partir',2,'M','A'],
+
+  // mscpo — CPO
+  ['mscpo','Modernización','Java 11 + SB 2.x, rama migración 10 commits desfasada',2,'A','M'],
+  ['mscpo','Operación','Puerto 8888 no estándar para el servicio',4,'B','B'],
+
+  // mscs — Charge Service
+  ['mscs','Arquitectura','Único servicio en MariaDB cuando el resto usa MySQL 8',3,'M','M'],
+  ['mscs','Modernización','parent3 1.0.11 desactualizado',3,'M','B'],
+  ['mscs','Arquitectura','Orquesta 7 microservicios — alta integración',3,'M','M'],
+
+  // msl — Loyalty
+  ['msl','Modernización','RestTemplate hacia Xmart sin migrar a Feign',3,'M','M'],
+
+  // msmail — Mail
+  ['msmail','Modernización','aws-java-sdk-ses:1.12.429 (SDK v1 EOL)',2,'A','M'],
+  ['msmail','Calidad','@Autowired field injection en código legacy',3,'M','B'],
+
+  // msn — Notification
+  ['msn','Modernización','parent3 2.0.0 actualizable a 2.0.2',4,'B','B'],
+  ['msn','Calidad','Sin tests de integración FCM',3,'M','M'],
+
+  // msp — Payment
+  ['msp','Arquitectura','3 proveedores PSP (Ingenico/SIBS/Paytef) en mismo servicio',2,'M','A'],
+  ['msp','Modernización','3 residuos javax.ws.rs.*',3,'M','B'],
+  ['msp','Calidad','SdkPaymentServiceImpl 600 LOC y SibsPaymentService 599 LOC',2,'M','M'],
+  ['msp','Seguridad','Auditar CVEs del SDK Ingenico',2,'A','B'],
+
+  // mspartner — Partner
+  ['mspartner','Arquitectura','7 dominios funcionales acumulados (alliances, milestones, MGM, Polaris, VipDistrict, NPS, promocodes)',2,'M','A'],
+  ['mspartner','Modernización','6 librerías Feign + 2 Feign hardcoded',3,'M','M'],
+
+  // msplink — PLINK
+  ['msplink','Modernización','parent3 1.0.10 desactualizado',3,'M','B'],
+  ['msplink','Calidad','4 clientes RestTemplate hacia PLINK sin migrar a Feign',3,'M','M'],
+
+  // mspproxy — PProxy
+  ['mspproxy','Modernización','Java 11 + SB 2.x con JAXB intensivo (26 ficheros)',2,'A','A'],
+  ['mspproxy','Modernización','Inconsistencia Dockerfile Java 21 + CI Java 11',2,'A','B'],
+  ['mspproxy','Calidad','Único servicio con Quality Gate PASSED',5,'-','-'],
+
+  // msprom — Promotion
+  ['msprom','Modernización','Parent POM custom (mkt-emsp-microservice-parent:1.1.4) no estándar',2,'A','M'],
+  ['msprom','Modernización','Flyway 5.2.4 EOL + MariaDB JDBC 2.4.0',2,'A','M'],
+  ['msprom','Calidad','Cobertura real <20% enmascarada por exclusiones',2,'M','M'],
+
+  // msrefueling — Refueling
+  ['msrefueling','Calidad','ClientUtils con 433 LOC',3,'M','B'],
+
+  // msrfid — RFID
+  ['msrfid','Modernización','parent3 2.0.0 actualizable',4,'B','B'],
+  ['msrfid','Calidad','Único con show-sql: false correcto — referencia',5,'-','-'],
+
+  // mss — Support
+  ['mss','Modernización','Parent POM microservice-parent:1.0.8 atípico (no ms2 ni ms3)',2,'A','M'],
+  ['mss','Modernización','Inconsistencia Dockerfile Java 21 + CI Java 11',2,'A','B'],
+  ['mss','Modernización','Artefacto 0.0.3 — versionado atípico',3,'M','B'],
+
+  // msset — Settings
+  ['msset','Calidad','Mejor configuración Sonar del ecosistema',5,'-','-'],
+
+  // mssms — SMS
+  ['mssms','Modernización','aws-java-sdk-pinpoint:1.12.710 (SDK v1 EOL)',2,'A','M'],
+  ['mssms','Operación','DEBUG logs activos en producción',3,'M','B'],
+  ['mssms','Modernización','parent3 1.0.6 (el más antiguo del ecosistema)',2,'M','B'],
+  ['mssms','Calidad','Quality Gate PASSED + 90% cobertura — referencia',5,'-','-'],
+
+  // msstation — Station
+  ['msstation','Modernización','parent3 2.0.0 actualizable',4,'B','B'],
+  ['msstation','Calidad','StationServiceImpl 476 LOC',3,'M','M'],
+  ['msstation','Operación','Refresh @Scheduled cada 30 min — revisar',3,'M','B'],
+
+  // mssubscriptions — Subscriptions
+  ['mssubscriptions','Calidad','Inconsistencia credenciales datasource principal vs Flyway',3,'M','B'],
+  ['mssubscriptions','Calidad','Único con mutation testing PIT — referencia',5,'-','-'],
+
+  // msv — Vehicle
+  ['msv','Modernización','Parent POM propio (mkt-emsp-ms-parent:1.0.6) incompatible',2,'A','M'],
+  ['msv','Calidad','MockService embebido en código de producción',1,'A','B'],
+  ['msv','Calidad','Único sin OpenAPI Generator (Swagger manual)',3,'M','M'],
+  ['msv','Modernización','MariaDB JDBC 2.4.0 EOL',3,'M','B'],
+
+  // msvouchers — Vouchers
+  ['msvouchers','Modernización','CI Java 11 + Dockerfile Java 21',2,'A','B'],
+  ['msvouchers','Modernización','Rama feature/all_branches_merged muy avanzada (119↑/1↓)',3,'A','M']
+];
+
+const prioBadge = p=>{
+  if(p==='A') return '<span class="pill priority-high">A</span>';
+  if(p==='M') return '<span class="pill priority-med">M</span>';
+  if(p==='B') return '<span class="pill priority-low">B</span>';
+  return '<span class="pill pill-grey">—</span>';
+};
+const ratingBadge = r => `<span class="rating-cell rating-${r}">${r}</span>`;
+
+const tbody = document.getElementById('pxe-tbody');
+tbody.innerHTML = findings.map(f=>`
+  <tr>
+    <td><strong>${f[0]}</strong></td>
+    <td style="color:var(--grey-600);">${f[1]}</td>
+    <td>${f[2]}</td>
+    <td style="text-align:center;">${ratingBadge(f[3])}</td>
+    <td style="text-align:center;">${prioBadge(f[4])}</td>
+    <td style="text-align:center;">${prioBadge(f[5])}</td>
+  </tr>
+`).join('');
+
+/* =========================================================
+   PRESENTATION NAVIGATION
+========================================================= */
+const slides = Array.from(document.querySelectorAll('.slide'));
+const deck = document.getElementById('deck');
+const stage = document.getElementById('stage');
+const counter = document.getElementById('slideCounter');
+let current = 0;
+
+function pad(n){return String(n).padStart(2,'0');}
+function show(){
+  slides.forEach((s,i)=>s.classList.toggle('active', i===current));
+  if(counter) counter.textContent = pad(current+1)+' / '+pad(slides.length);
+  history.replaceState(null,'','#s'+(current+1));
+  // create charts lazily on first visit, resize on subsequent visits
+  requestAnimationFrame(()=>{
+    ensureCharts(slides[current]);
+    slides[current].querySelectorAll('canvas').forEach(cv=>{
+      const c = Chart.getChart && Chart.getChart(cv);
+      if(c) c.resize();
+    });
+  });
+}
+function go(dir){
+  current = Math.max(0, Math.min(slides.length-1, current+dir));
+  show();
+}
+function fit(){
+  const w = stage.clientWidth, h = stage.clientHeight;
+  const scale = Math.min((w-32)/1280, (h-32)/720);
+  deck.style.transform = 'scale('+scale+')';
+}
+window.addEventListener('resize', fit);
+window.addEventListener('keydown', e=>{
+  if(['ArrowRight','PageDown',' '].includes(e.key)){
+    e.preventDefault(); go(1);
+  }
+  if(['ArrowLeft','PageUp'].includes(e.key)){
+    e.preventDefault(); go(-1);
+  }
+  if(['ArrowDown','ArrowUp'].includes(e.key)){
+    // allow vertical scroll inside the anexo slide; navigate elsewhere
+    if(slides[current].classList.contains('anexo-slide')) return;
+    e.preventDefault();
+    go(e.key==='ArrowDown'?1:-1);
+  }
+  if(e.key==='Home'){current=0;show();}
+  if(e.key==='End'){current=slides.length-1;show();}
+});
+// initial
+if(location.hash.match(/^#s\d+$/)){
+  const n = parseInt(location.hash.slice(2),10);
+  if(n>=1 && n<=slides.length) current = n-1;
+}
+fit();
+show();
+window.go = go;
+</script>
+
+</body>
+</html>

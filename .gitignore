@@ -1,0 +1,6 @@
+# Whitelist mode: ignorar todo por defecto, dejar solo lo aprobado
+*
+!.gitignore
+!auditoria-backend-moeve.html
+!assets/
+!assets/**
