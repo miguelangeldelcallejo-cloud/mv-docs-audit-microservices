@@ -311,34 +311,32 @@
 <section class="slide" id="s5">
   <div class="slide-content">
     <div class="eyebrow">03 · Resumen ejecutivo</div>
-    <h2 class="deck-h2 mt-1">Los tres titulares</h2>
-    <div class="accent-bar mt-3 mb-6"></div>
-    <div class="grid grid-cols-3 gap-5" style="flex:1;">
-      <div style="background:linear-gradient(135deg,var(--navy),var(--navy-soft));color:#fff;padding:24px;border-radius:8px;display:flex;flex-direction:column;">
-        <div style="font-size:60px;font-weight:800;line-height:1;">64%</div>
-        <div style="font-size:13px;opacity:.8;margin-top:8px;letter-spacing:.05em;">DEL ECOSISTEMA YA EN<br/>JAVA 21 + SPRING BOOT 3.X</div>
-        <div style="margin-top:auto;font-size:13px;line-height:1.55;padding-top:14px;border-top:1px solid rgba(255,255,255,.2);">
-          18 de 28 servicios modernizados. Quedan 10 servicios por migrar, entre ellos los dos más grandes del ecosistema (<strong>mst</strong> y <strong>msu</strong>).
-        </div>
-      </div>
-      <div style="background:linear-gradient(135deg,var(--coral),#b85055);color:#fff;padding:24px;border-radius:8px;display:flex;flex-direction:column;">
-        <div style="font-size:60px;font-weight:800;line-height:1;">86%</div>
-        <div style="font-size:13px;opacity:.95;margin-top:8px;letter-spacing:.05em;">QUALITY GATE EN ROJO<br/>EN SONARCLOUD</div>
-        <div style="margin-top:auto;font-size:13px;line-height:1.55;padding-top:14px;border-top:1px solid rgba(255,255,255,.3);">
-          24 servicios incumplen el Quality Gate. Causas dominantes: exclusiones amplias en Sonar y patrones repetidos de configuración insegura.
-        </div>
-      </div>
-      <div style="background:#1f3a48;color:#fff;padding:24px;border-radius:8px;display:flex;flex-direction:column;">
-        <div style="font-size:60px;font-weight:800;line-height:1;">9</div>
-        <div style="font-size:13px;opacity:.85;margin-top:8px;letter-spacing:.05em;">RESPONSABILIDADES EN UN<br/>MISMO MICROSERVICIO (mst)</div>
-        <div style="margin-top:auto;font-size:13px;line-height:1.55;padding-top:14px;border-top:1px solid rgba(255,255,255,.2);">
-          El servicio <strong>Transaction</strong> concentra sesiones de carga, repostaje, pagos, RFID, suscripciones, admin, WebSocket y conciliación contable contra varios sistemas externos (SAFT, STAR, GIC, SAP). Al parecer es un cuello de botella estructural del backend.
-        </div>
+    <h2 class="deck-h2 mt-1">Diagnóstico</h2>
+    <div class="accent-bar mt-3 mb-7"></div>
+    <div style="background:linear-gradient(135deg,var(--navy),var(--navy-soft));color:#fff;padding:42px 56px;border-radius:8px;text-align:center;position:relative;overflow:hidden;">
+      <div style="position:absolute;top:18px;left:24px;font-size:64px;line-height:.7;color:rgba(232,157,160,.45);font-family:Georgia,serif;">“</div>
+      <div style="position:absolute;bottom:8px;right:28px;font-size:64px;line-height:.7;color:rgba(232,157,160,.45);font-family:Georgia,serif;">”</div>
+      <div style="font-size:30px;font-weight:600;line-height:1.3;letter-spacing:-.01em;position:relative;z-index:1;">
+        Un backend operativo en plataforma moderna<br/>que requiere <span style="color:var(--coral);font-weight:700;">consolidación selectiva</span>, no reconstrucción.
       </div>
     </div>
-    <div class="mt-6 grid grid-cols-2 gap-6" style="font-size:13px;color:var(--grey-600);">
-      <div><strong style="color:var(--navy)">Buenas noticias.</strong> El núcleo del ecosistema ya está en Java 21. Servicios pequeños como <em>mssms</em> y <em>msrfid</em> son modelos a replicar (cobertura &gt;90%, configuración limpia, parent moderno).</div>
-      <div><strong style="color:var(--navy)">Por trabajar.</strong> Tres bloques: terminar la migración Java en los 10 restantes, normalizar la configuración común (perfiles de log, alineación Docker/CI, parent POM) y abrir la descomposición funcional de <em>mst</em> y <em>msu</em>.</div>
+    <div class="mt-7 grid grid-cols-2 gap-x-10 gap-y-5" style="font-size:13.5px;color:var(--grey-700);line-height:1.6;flex:1;">
+      <div style="display:flex;gap:14px;align-items:flex-start;">
+        <span style="display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:50%;background:var(--coral);color:#fff;font-size:14px;font-weight:800;flex-shrink:0;line-height:1;">1</span>
+        <div><strong style="color:var(--navy)">Dos tercios del ecosistema ya están donde deben estar.</strong> 18 de 28 microservicios desplegados en Java 21 + Spring Boot 3.x. La base no se reconstruye, se completa.</div>
+      </div>
+      <div style="display:flex;gap:14px;align-items:flex-start;">
+        <span style="display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:50%;background:var(--coral);color:#fff;font-size:14px;font-weight:800;flex-shrink:0;line-height:1;">2</span>
+        <div><strong style="color:var(--navy)">La deuda está concentrada, no distribuida.</strong> <em>mst</em> acumula 9 responsabilidades y, junto a <em>msu</em>, retiene casi todo el esfuerzo pendiente del programa.</div>
+      </div>
+      <div style="display:flex;gap:14px;align-items:flex-start;">
+        <span style="display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:50%;background:var(--coral);color:#fff;font-size:14px;font-weight:800;flex-shrink:0;line-height:1;">3</span>
+        <div><strong style="color:var(--navy)">Más de 200 incidencias heredadas</strong> en el área de mantenimiento. El backlog se sanea antes de abrir nuevos evolutivos para arrancar la estabilización con cola limpia.</div>
+      </div>
+      <div style="display:flex;gap:14px;align-items:flex-start;">
+        <span style="display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:50%;background:var(--coral);color:#fff;font-size:14px;font-weight:800;flex-shrink:0;line-height:1;">4</span>
+        <div><strong style="color:var(--navy)">El plan ya está sobre la mesa.</strong> Cinco fases hasta Q2 de 2027: traspaso completado, control en marcha y consolidación final en 2027.</div>
+      </div>
     </div>
   </div>
   <div class="slide-foot">Resumen ejecutivo</div>
